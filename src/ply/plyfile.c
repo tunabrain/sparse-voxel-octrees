@@ -207,7 +207,7 @@ PlyFile *ply_open_for_writing(
 
   /* open the file for writing */
 
-  fp = fopen (name, "w");
+  fp = fopen (name, "wb");
   if (fp == NULL) {
     return (NULL);
   }
@@ -819,7 +819,7 @@ PlyFile *ply_open_for_reading(
 
   /* open the file for reading */
 
-  fp = fopen (name, "r");
+  fp = fopen (name, "rb");
   if (fp == NULL)
     return (NULL);
 
@@ -2148,6 +2148,8 @@ void get_binary_item(
   void *ptr;
 
   ptr = (void *) c;
+
+  size_t pos = ftell(fp);
 
   switch (type) {
     case PLY_CHAR:

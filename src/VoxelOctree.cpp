@@ -1,3 +1,26 @@
+/*
+Copyright (c) 2013 Benedikt Bitterli
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+   1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+   2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+   3. This notice may not be removed or altered from any source
+   distribution.
+*/
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,6 +28,7 @@
 
 #include "VoxelOctree.hpp"
 #include "VoxelData.hpp"
+#include "Debug.hpp"
 #include "Util.hpp"
 
 using namespace std;
@@ -32,25 +56,43 @@ VoxelOctree::VoxelOctree(const char *path) : _voxels(0) {
 	FILE* fp = fopen(path, "rb");
 
 	if (fp) {
-		int pointerCount;
-		fread(&pointerCount, sizeof(uint32_t), 1, fp);
-		_farPointers.resize(pointerCount);
-		fread(&_farPointers[0], sizeof(uint32_t), pointerCount, fp);
+		fread(_center.a, sizeof(float), 3, fp);
 
-		int dataSize;
-		fread(&dataSize, sizeof(uint32_t), 1, fp);
-		_octree.resize(dataSize/4);
-		fread(&_octree[0], 1, dataSize, fp);
+		int pointerCount, octreeSize;
+		fread(&pointerCount, sizeof(uint32_t), 1, fp);
+		fread(&octreeSize,   sizeof(uint32_t), 1, fp);
+
+		_farPointers.resize(pointerCount);
+		_octree     .resize(octreeSize);
+
+		fread(&_farPointers[0], sizeof(uint32_t), pointerCount, fp);
+		fread(&_octree[0],      sizeof(uint32_t), octreeSize,   fp);
+
+		fclose(fp);
+	}
+}
+
+void VoxelOctree::save(const char *path) {
+	FILE* fp = fopen(path, "wb");
+
+	if (fp) {
+		uint32_t pointerCount = _farPointers.size();
+		uint32_t octreeSize   = _octree.size();
+
+		fwrite(_center.a, sizeof(float), 3, fp);
+		fwrite(&pointerCount, sizeof(uint32_t), 1, fp);
+		fwrite(&octreeSize,   sizeof(uint32_t), 1, fp);
+		fwrite(&_farPointers[0], sizeof(uint32_t), pointerCount, fp);
+		fwrite(&_octree[0],      sizeof(uint32_t), octreeSize,   fp);
 
 		fclose(fp);
 	}
 }
 
 VoxelOctree::VoxelOctree(VoxelData *voxels) : _voxels(voxels) {
-	int size = max(_voxels->virtualDataW, max(_voxels->virtualDataH, _voxels->virtualDataD));
-
 	_octree.push_back(0);
-	buildOctree(0, 0, 0, size, 0);
+	buildOctree(0, 0, 0, _voxels->sideLength(), 0);
+	_center = _voxels->getCenter();
 }
 
 void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptorIndex) {
@@ -63,9 +105,9 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
 	int posZ[] = {z + halfSize, z + halfSize, z + halfSize, z + halfSize, z, z, z, z};
 
 	uint8_t children = 0;
-	for (int I = 0; I < 8; I++)
-		if (_voxels->cubeContainsVoxels(posX[I], posY[I], posZ[I], halfSize))
-			children |= 128 >> I;
+	for (int i = 0; i < 8; i++)
+		if (_voxels->cubeContainsVoxels(posX[i], posY[i], posZ[i], halfSize))
+			children |= 128 >> i;
 
 	uint32_t childIndex = _octree.size() - descriptorIndex;
 
@@ -73,18 +115,18 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
 	if (halfSize == 1) {
 		leafs = 0;
 
-		for (int I = 0; I < 8; I++)
-			if (children & (1 << I))
-				_octree.push_back(_voxels->GetNormal(posX[7 - I], posY[7 - I], posZ[7 - I]));
+		for (int i = 0; i < 8; i++)
+			if (children & (1 << i))
+				_octree.push_back(_voxels->getVoxel(posX[7 - i], posY[7 - i], posZ[7 - i]));
 	} else {
 		leafs = children;
 		uint32_t childDescriptor = _octree.size();;
 		for (unsigned i = 0; i < BitCount[children]; i++)
 			_octree.push_back(0);
 
-		for (int I = 0; I < 8; I++)
-			if (children & (1 << I))
-				buildOctree(posX[7 - I], posY[7 - I], posZ[7 - I], halfSize, childDescriptor++);
+		for (int i = 0; i < 8; i++)
+			if (children & (1 << i))
+				buildOctree(posX[7 - i], posY[7 - i], posZ[7 - i], halfSize, childDescriptor++);
 	}
 
 	if (childIndex > 0x7FFF) {
@@ -97,9 +139,10 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
 bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float &t) {
 	uint32_t rayStack[MaxScale + 1][2];
 
-	float ox = o.x + 1.5f; //A small hack to center the volume around the origin
-	float oy = o.y + 1.5f;
-	float oz = o.z + 1.5f;
+	for (int i = 0; i <= MaxScale; i++)
+		rayStack[i][0] = 0xBA5EBA11;
+
+	float ox = o.x, oy = o.y, oz = o.z;
 	float dx = d.x, dy = d.y, dz = d.z;
 
 	if (fabsf(dx) < 1e-4) dx = 1e-4;
@@ -121,7 +164,6 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float
 
 	float minT = max(2.0f*dTx - bTx, max(2.0f*dTy - bTy, 2.0f*dTz - bTz));
 	float maxT = min(     dTx - bTx, min(     dTy - bTy,      dTz - bTz));
-	float h = maxT;
 	minT = max(minT, 0.0f);
 
 	uint32_t current = 0;
@@ -168,12 +210,8 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float
 					break;
 				}
 
-				if (maxTC < h) {
-					rayStack[scale][0] = parent;
-					rayStack[scale][1] = floatBitsToUint(maxT);
-				}
-
-				h = maxTC;
+				rayStack[scale][0] = parent;
+				rayStack[scale][1] = floatBitsToUint(maxT);
 
 				childOffset += BitCount[childMasks & 127];
 				parent      += childOffset;
@@ -220,7 +258,6 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float
 			posZ = uintBitsToFloat(shZ << scale);
 			idx = (shX & 1) | ((shY & 1) << 1) | ((shZ & 1) << 2);
 
-			h = 0.0f;
 			current = 0;
 		}
 	}
@@ -230,29 +267,4 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float
 
 	t = minT;
 	return true;
-}
-
-void VoxelOctree::save(const char *path) {
-	FILE* fp = fopen(path, "wb");
-
-	if (fp) {
-		uint32_t pointerCount = _farPointers.size();
-		uint32_t dataSize = _octree.size()*sizeof(uint32_t);
-
-		fwrite(&pointerCount, sizeof(uint32_t), 1, fp);
-		fwrite(&_farPointers[0], sizeof(uint32_t), pointerCount, fp);
-
-		fwrite(&dataSize, sizeof(uint32_t), 1, fp);
-		fwrite(&_octree[0], 1, dataSize, fp);
-
-//		uint32_t pointerCount = _farPointers.size();
-//		uint32_t octreeSize   = _octree.size();
-//
-//		fwrite(&pointerCount, sizeof(uint32_t), 1, fp);
-//		fwrite(&octreeSize,   sizeof(uint32_t), 1, fp);
-//		fwrite(&_farPointers[0], sizeof(uint32_t), pointerCount, fp);
-//		fwrite(&_octree[0],      sizeof(uint32_t), octreeSize,   fp);
-
-		fclose(fp);
-	}
 }

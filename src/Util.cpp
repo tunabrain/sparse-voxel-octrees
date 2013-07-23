@@ -1,15 +1,31 @@
 /*
- * Util.cpp
- *
- *  Created on: 09.01.2011
- *      Author: Noobody
- */
+Copyright (c) 2013 Benedikt Bitterli
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+   1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+   2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+   3. This notice may not be removed or altered from any source
+   distribution.
+*/
 
 #include "Util.hpp"
 
-uint32_t compressNormal(const Vec3 &n) {
-	const int32_t uScale = (1 << 15) - 1;
-	const int32_t vScale = (1 << 14) - 1;
+uint32_t compressMaterial(const Vec3 &n, float shade) {
+	const int32_t uScale = (1 << 11) - 1;
+	const int32_t vScale = (1 << 11) - 1;
 
 	uint32_t face = 0;
 	float dominantDir = fabsf(n.x);
@@ -22,24 +38,27 @@ uint32_t compressNormal(const Vec3 &n) {
 	float n1 = n.a[mod3[face + 1]]/dominantDir;
 	float n2 = n.a[mod3[face + 2]]/dominantDir;
 
-	uint32_t u = (int32_t)((n1*0.5 + 0.5)*uScale);
-	uint32_t v = (int32_t)((n2*0.5 + 0.5)*vScale);
+	uint32_t u = (int32_t)((n1*0.5f + 0.5f)*uScale);
+	uint32_t v = (int32_t)((n2*0.5f + 0.5f)*vScale);
+	uint32_t c = (int32_t)(shade*127.0f);
 
-	return (sign << 31) | (face << 29) | (u << 14) | v;
+	return (sign << 31) | (face << 29) | (u << 18) | v << 7 | c;
 }
 
-void decompressNormal(uint32_t normal, Vec3 &dst) {
+void decompressMaterial(uint32_t normal, Vec3 &dst, float &shade) {
 	uint32_t sign = (normal & 0x80000000) >> 31;
 	uint32_t face = (normal & 0x60000000) >> 29;
-	uint32_t u    = (normal & 0x1FFFC000) >> 14;
-	uint32_t v    = (normal & 0x00003FFF);
+	uint32_t u    = (normal & 0x1FFC0000) >> 18;
+	uint32_t v    = (normal & 0x0003FF80) >> 7;
+	uint32_t c    = (normal & 0x0000007F);
 
 	const int mod3[] = {0, 1, 2, 0, 1};
 	dst.a[     face     ] = (sign ? -1.0 : 1.0);
-	dst.a[mod3[face + 1]] = u*3.0519e-5*2.0f - 1.0f;
-	dst.a[mod3[face + 2]] = v*6.1037e-5*2.0f - 1.0f;
+	dst.a[mod3[face + 1]] = u*4.8852e-4*2.0f - 1.0f;
+	dst.a[mod3[face + 2]] = v*4.8852e-4*2.0f - 1.0f;
 
 	fastNormalization(dst);
+	shade = c*1.0/127.0f;
 }
 
 float invSqrt(float x) { //Inverse square root as used in Quake III

@@ -1,3 +1,26 @@
+/*
+Copyright (c) 2013 Benedikt Bitterli
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+   1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+   2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+   3. This notice may not be removed or altered from any source
+   distribution.
+*/
+
 #include <SDL/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,15 +30,16 @@
 #include <dirent.h>
 #include <algorithm>
 
+#include "math/MatrixStack.hpp"
+#include "ThreadBarrier.hpp"
+#include "VoxelOctree.hpp"
 #include "math/Vec3.hpp"
 #include "math/Vec4.hpp"
 #include "math/Mat4.hpp"
-#include "math/MatrixStack.hpp"
 #include "PlyLoader.hpp"
-#include "Util.hpp"
-#include "Events.hpp"
 #include "VoxelData.hpp"
-#include "VoxelOctree.hpp"
+#include "Events.hpp"
+#include "Util.hpp"
 
 using namespace std;
 
@@ -24,48 +48,9 @@ static const int GHeight = 600;
 static const int NumThreads = 20;
 
 static SDL_Surface *backBuffer;
+static ThreadBarrier *barrier;
 
-static volatile int waitCount;
 static volatile bool doTerminate;
-static SDL_mutex *barrierMutex;
-static SDL_sem *turnstile1, *turnstile2;
-
-void barrierWaitPre() {
-	SDL_mutexP(barrierMutex);
-	waitCount++;
-	if (waitCount == NumThreads)
-		for (int i = 0; i < NumThreads; i++)
-			SDL_SemPost(turnstile1);
-	SDL_mutexV(barrierMutex);
-
-	SDL_SemWait(turnstile1);
-}
-
-void barrierWaitPost() {
-	SDL_mutexP(barrierMutex);
-	waitCount--;
-	if (waitCount == 0)
-		for (int i = 0; i < NumThreads; i++)
-			SDL_SemPost(turnstile2);
-	SDL_mutexV(barrierMutex);
-
-	SDL_SemWait(turnstile2);
-}
-
-#include <windows.h>
-static LARGE_INTEGER timeStart, timeStop;
-static void startTimer() {
-    QueryPerformanceCounter(&timeStart);
-}
-
-static double stopTimer() {
-    QueryPerformanceCounter(&timeStop);
-
-    LARGE_INTEGER frequency;
-    QueryPerformanceFrequency(&frequency);
-
-    return (timeStop.QuadPart - timeStart.QuadPart)/(double)frequency.QuadPart*1000.0;
-}
 
 struct BatchData {
 	int id;
@@ -77,9 +62,10 @@ struct BatchData {
 
 Vec3 shade(int intNormal, const Vec3 &light) {
 	Vec3 n;
-	decompressNormal(intNormal, n);
+	float c;
+	decompressMaterial(intNormal, n, c);
 
-	return Vec3(max(light.dot(n), 0.0f));
+	return c;//*0.5 + 0.5*Vec3(max(light.dot(n), 0.0f));
 }
 
 void renderBatch(BatchData *data) {
@@ -90,7 +76,7 @@ void renderBatch(BatchData *data) {
 	Mat4 tform;
 	MatrixStack::get(INV_MODELVIEW_STACK, tform);
 
-	Vec3 pos = tform*Vec3();
+	Vec3 pos = tform*Vec3() + tree->center() + Vec3(1.0);
 
 	tform.a14 = tform.a24 = tform.a34 = 0.0f;
 
@@ -101,7 +87,7 @@ void renderBatch(BatchData *data) {
 	float planeDist = 1.0/tan(M_PI/6.0f);
 	float zx = planeDist*tform.a13, zy = planeDist*tform.a23, zz = planeDist*tform.a33;
 
-	Vec3 light = (tform*Vec3(1.0)).normalize();
+	Vec3 light = (tform*Vec3(-1.0, 1.0, -1.0)).normalize();
 
 	float dy = 1.0 - y0*scale;
 	for (int y = y0; y < y1; y++, dy -= scale) {
@@ -133,9 +119,9 @@ int renderLoop(void *threadData) {
 	BatchData *data = (BatchData *)threadData;
 
 	while (!doTerminate) {
-		barrierWaitPre();
+		barrier->waitPre();
 		renderBatch(data);
-		barrierWaitPost();
+		barrier->waitPost();
 
 		if (data->id == 0) {
 			if (SDL_MUSTLOCK(backBuffer))
@@ -145,21 +131,25 @@ int renderLoop(void *threadData) {
 
 			printf("Time: %fms\n", stopTimer());
 
-			int EventType;
-			while ((EventType = WaitEvent()) != SDL_MOUSEBUTTONDOWN && EventType != SDL_KEYDOWN && GetMouseDown(0) == 0);
+			int event;
+			while ((event = WaitEvent()) != SDL_MOUSEBUTTONDOWN && event != SDL_KEYDOWN && !GetMouseDown(0) && !GetMouseDown(1));
 
 			if (GetKeyDown(SDLK_ESCAPE)) {
 				doTerminate = true;
-				for (int i = 0; i < NumThreads; i++) {
-					SDL_SemPost(turnstile1);
-					SDL_SemPost(turnstile2);
-				}
+				barrier->releaseAll();
 			}
 
-			float yaw   =  GetMouseXSpeed();
-			float pitch = -GetMouseYSpeed();
-			if (GetMouseDown(0))
-				MatrixStack::mulR(MODEL_STACK, Mat4::rotYZX(Vec3(pitch, yaw, 0.0f)));
+			float mx = GetMouseXSpeed();
+			float my = GetMouseYSpeed();
+			if (GetMouseDown(0) && (mx != 0 || my != 0)) {
+				Mat4 tform;
+				MatrixStack::get(INV_MODELVIEW_STACK, tform);
+				Vec4 x = tform*Vec4(1.0, 0.0, 0.0, 0.0);
+				Vec4 y = tform*Vec4(0.0, -1.0, 0.0, 0.0);
+				Vec3 axis(mx*y.x - my*x.x, mx*y.y - my*x.y, mx*y.z - my*x.z);
+				MatrixStack::mulR(MODEL_STACK, Mat4::rotAxis(axis.normalize(), sqrtf(mx*mx + my*my)));
+			} else if (GetMouseDown(1))
+				MatrixStack::mulR(VIEW_STACK, Mat4::scale(Vec3(1.0f, 1.0f, 1.0f + my*0.01f)));
 
 			startTimer();
 
@@ -171,49 +161,32 @@ int renderLoop(void *threadData) {
 	return 0;
 }
 
-void generateSampleData(const char *path, int size) {
-	uint16_t *data = new uint16_t[size*size*size];
-
-	for (int z = 0, idx = 0; z < size; z++)
-		for (int y = 0; y < size; y++)
-			for (int x = 0; x < size; x++, idx++)
-				data[idx] = (uint16_t)(((sin(x*0.1)*sin(y*0.1)*sin(z*0.1))*0.5 + 0.5)*65535.0);
-
-	FILE *fp = fopen(path, "wb");
-	if (fp) {
-		fwrite(&size, sizeof(int), 1, fp);
-		fwrite(&size, sizeof(int), 1, fp);
-		fwrite(&size, sizeof(int), 1, fp);
-		fwrite(data, sizeof(uint16_t), size*size*size, fp);
-		fclose(fp);
-	}
-}
+static const size_t conversionMemory = 1024*1024*1024;
+static const size_t  lutMemory = 512*1024*1024;
+static const size_t dataMemory = 1024*1024*1024;
 
 int main(int argc, char *argv[]) {
-	PlyLoader loader("xyzrgb_dragon.ply");
-
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_WM_SetCaption("Sparse Voxel Octrees", "Sparse Voxel Octrees");
 	backBuffer = SDL_SetVideoMode(GWidth, GHeight, 32, SDL_SWSURFACE);
 
-	//generateSampleData("Test.voxel", 512);
-	VoxelData data("Test.voxel");
-	startTimer();
-	VoxelOctree tree(&data);
-	printf("Octree built in %fms\n", stopTimer());
-	//VoxelOctree tree("HeadNew.oct");
-
-	//return 0;
+#if 1
+	PlyLoader loader("xyzrgb_dragon.ply");
+	loader.convertToVolume("Test.voxel", 2048, conversionMemory);
+	VoxelData *data = new VoxelData("Test.voxel", lutMemory, dataMemory);
+	VoxelOctree tree(data);
+	delete data;
+	tree.save("Test.oct");
+#else
+	VoxelOctree tree("Test.oct");
+#endif
 
 	MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0, 0.0, -2.0)));
 
 	SDL_Thread *threads[NumThreads - 1];
 	BatchData threadData[NumThreads];
 
-	barrierMutex = SDL_CreateMutex();
-	turnstile1   = SDL_CreateSemaphore(0);
-	turnstile2   = SDL_CreateSemaphore(0);
-	waitCount = 0;
+	barrier = new ThreadBarrier(NumThreads);
 	doTerminate = false;
 
 	if (SDL_MUSTLOCK(backBuffer))

@@ -2,7 +2,7 @@ CC = gcc
 CXX = g++
 RM = rm -f
 WARNINGS = -Wall -Wformat -Wcast-align
-CFLAGS = -Isrc/ -g3 $(WARNINGS)
+CFLAGS = -Isrc/ -O2 $(WARNINGS)
 
 ifeq ($(OS),Windows_NT)
     LDFLAGS = -lmingw32 -lSDLmain -lSDL
@@ -17,7 +17,8 @@ endif
 
 MATH_OBJS = Mat4.o Vec3.o Vec4.o MatrixStack.o
 SVO_OBJS = Debug.o Events.o Main.o Util.o VoxelData.o VoxelOctree.o \
-	PlyLoader.o ply/plyfile.o $(addprefix math/,$(MATH_OBJS))
+	PlyLoader.o tribox3.o ply/plyfile.o ThreadBarrier.o \
+	$(addprefix math/,$(MATH_OBJS))
 OBJECTS = $(addprefix src/,$(SVO_OBJS))
 
 svo: $(OBJECTS)
