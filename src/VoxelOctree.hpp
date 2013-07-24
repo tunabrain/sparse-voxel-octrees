@@ -44,12 +44,12 @@ class VoxelOctree {
 
 public:
 
+	void save(const char *path);
+	bool raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_t &normal, float &t);
+
 	Vec3 center() const {
 		return _center;
 	}
-
-	void save(const char *path);
-	bool raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float &t);
 
 	VoxelOctree(const char *path);
 	VoxelOctree(VoxelData *voxels);

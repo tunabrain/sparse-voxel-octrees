@@ -27,8 +27,8 @@ freely, subject to the following restrictions:
 
 #include "PlyLoader.hpp"
 #include "Debug.hpp"
-#include "ply/ply.h"
-#include "tribox3.h"
+#include "third-party/ply.h"
+#include "third-party/tribox3.h"
 #include "Util.hpp"
 
 using namespace std;
@@ -48,11 +48,43 @@ Triangle::Triangle(const Vertex &_v1, const Vertex &_v2, const Vertex &_v3) :
 	);
 }
 
+bool Triangle::barycentric(const Vec3 &p, float &lambda1, float &lambda2) const {
+    Vec3 f1 = v1.pos - p;
+    Vec3 f2 = v2.pos - p;
+    Vec3 f3 = v3.pos - p;
+    float area = (v1.pos - v2.pos).cross(v1.pos - v3.pos).length();
+    lambda1 = f2.cross(f3).length()/area;
+    lambda2 = f3.cross(f1).length()/area;
+
+    return lambda1 >= 0.0f && lambda2 >= 0.0f && lambda1 + lambda2 <= 1.0f;
+}
+
+/* Used for sorting the right-most ends of triangles along the largest
+ * dimensions for rudimentary triangle culling.
+ */
+static int largestDim;
+static bool compareTriangles(const Triangle &a, const Triangle &b) {
+	return a.upper.a[largestDim] < b.upper.a[largestDim];
+}
+
 PlyLoader::PlyLoader(const char *path) : _lower(1e30), _upper(-1e30) {
+	PlyFile *file;
+
+	openPly(path, file);
+	readVertices(file);
+	rescaleVertices();
+	readTriangles(file);
+	ply_close(file);
+
+	vector<Vertex>().swap(_verts); /* Get rid of vertex data */
+	sort(_tris.begin(), _tris.end(), &compareTriangles); /* Sort for triangle culling */
+}
+
+void PlyLoader::openPly(const char *path, PlyFile *&file) {
 	int elemCount, fileType;
 	char **elemNames;
 	float version;
-	PlyFile *file = ply_open_for_reading((char *)path, &elemCount, &elemNames, &fileType, &version);
+	file = ply_open_for_reading(path, &elemCount, &elemNames, &fileType, &version);
 
 	ASSERT(file != 0, "Failed to open PLY at %s\n", path);
 
@@ -67,15 +99,13 @@ PlyLoader::PlyLoader(const char *path) : _lower(1e30), _upper(-1e30) {
 	}
 
 	ASSERT(hasVerts && hasTris, "PLY file has to have triangles and vertices\n");
+}
 
-	int vertCount, triCount, vertPropCount, triPropCount;
+void PlyLoader::readVertices(PlyFile *file) {
+	int vertCount, vertPropCount;
 	PlyProperty **vertProps = ply_get_element_description(file, "vertex", &vertCount, &vertPropCount);
-	PlyProperty ** triProps = ply_get_element_description(file, "face",    &triCount,  &triPropCount);
-
-	printf("%d triangles, %d vertices\n", triCount, vertCount);
 
 	_verts.reserve(vertCount);
-	_tris.reserve(triCount);
 
 	const char *vpNames[] = {"x", "y", "z", "nx", "ny", "nz", "red", "green", "blue"};
 	bool vpAvail[9] = {false};
@@ -112,15 +142,29 @@ PlyLoader::PlyLoader(const char *path) : _lower(1e30), _upper(-1e30) {
 			_upper.a[t] = max(_upper.a[t], vertData[t]);
 		}
 	}
+}
 
+void PlyLoader::rescaleVertices() {
 	Vec3 diff = _upper - _lower;
-	float factor = 1.0/max(diff.x, max(diff.y, diff.z));
+	largestDim = 2;
+	if (diff.x > diff.y && diff.x > diff.z)
+		largestDim = 0;
+	else if (diff.y > diff.z)
+		largestDim = 1;
+	float factor = 1.0/diff.a[largestDim];
 
-	for (int i = 0; i < vertCount; i++)
+	for (unsigned i = 0; i < _verts.size(); i++)
 		_verts[i].pos = (_verts[i].pos - _lower)*factor;
 
 	_upper *= factor;
 	_lower *= factor;
+}
+
+void PlyLoader::readTriangles(PlyFile *file) {
+	int triCount, triPropCount;
+	PlyProperty **triProps = ply_get_element_description(file, "face", &triCount, &triPropCount);
+
+	_tris.reserve(triCount);
 
 	for (int i = 0; i < triPropCount; i++) {
 		if (!strcmp(triProps[i]->name, "vertex_indices")) {
@@ -149,33 +193,43 @@ PlyLoader::PlyLoader(const char *path) : _lower(1e30), _upper(-1e30) {
 
 		free(face.elems);
 	}
-
-	vector<Vertex>().swap(_verts); /* Clear out vertex data */
-
-	ply_close(file);
 }
 
 void PlyLoader::writeTriangleCell(int x, int y, int z, float cx, float cy, float cz, const Triangle &t) {
 	size_t idx = (x - _bufferX) + _bufferW*(y - _bufferY + _bufferH*(z - _bufferZ));
 
-	/* TODO: Interpolate within triangle */
-	_normals[idx] += t.v1.normal;
-	_shade  [idx] += (int)t.v1.color.dot(Vec3(0.2126f, 0.7152f, 0.0722f));
+    float lambda1, lambda2, lambda3;
+    if (!t.barycentric(Vec3(cx, cy, cz), lambda1, lambda2)) {
+		lambda1 = min(max(lambda1, 0.0f), 1.0f);
+		lambda2 = min(max(lambda2, 0.0f), 1.0f);
+		float tau = lambda1 + lambda2;
+		if (tau > 1.0f) {
+			lambda1 /= tau;
+			lambda2 /= tau;
+		}
+    }
+	lambda3 = 1.0f - lambda1 - lambda2;
+
+	_normals[idx] += (t.v1.normal*lambda1 + t.v2.normal*lambda2 + t.v3.normal*lambda3).normalize();
+
+	/* Only store luminance - we only care about AO anyway */
+    Vec3 color = t.v1.color*lambda1 + t.v2.color*lambda2 + t.v3.color*lambda3;
+	_shade  [idx] += (int)color.dot(Vec3(0.2126f, 0.7152f, 0.0722f));
 	_counts [idx]++;
 }
 
-void PlyLoader::triangleToVolume(const Triangle &t, int size) {
-	int lx = max((int)(t.lower.x*size), _bufferX);
-	int ly = max((int)(t.lower.y*size), _bufferY);
-	int lz = max((int)(t.lower.z*size), _bufferZ);
-	int ux = min((int)(t.upper.x*size), _bufferX + _bufferW - 1);
-	int uy = min((int)(t.upper.y*size), _bufferY + _bufferH - 1);
-	int uz = min((int)(t.upper.z*size), _bufferZ + _bufferD - 1);
+void PlyLoader::triangleToVolume(const Triangle &t) {
+	int lx = max((int)(t.lower.x*_sideLength), _bufferX);
+	int ly = max((int)(t.lower.y*_sideLength), _bufferY);
+	int lz = max((int)(t.lower.z*_sideLength), _bufferZ);
+	int ux = min((int)(t.upper.x*_sideLength), _bufferX + _bufferW - 1);
+	int uy = min((int)(t.upper.y*_sideLength), _bufferY + _bufferH - 1);
+	int uz = min((int)(t.upper.z*_sideLength), _bufferZ + _bufferD - 1);
 
 	if (lx > ux || ly > uy || lz > uz)
 		return;
 
-	float hx = 1.0f/size;
+	float hx = 1.0f/_sideLength;
 	float triVs[][3] = {
 		{t.v1.pos.x, t.v1.pos.y, t.v1.pos.z},
 		{t.v2.pos.x, t.v2.pos.y, t.v2.pos.z},
@@ -197,61 +251,86 @@ void PlyLoader::triangleToVolume(const Triangle &t, int size) {
 	}
 }
 
+size_t PlyLoader::blockMemRequirement(int w, int h, int d) {
+	size_t elementCost = sizeof(Vec3) + sizeof(uint32_t) + sizeof(uint16_t);
+	return ((w*elementCost)*h)*d;
+}
+
+void PlyLoader::setupBlockProcessing(size_t elementCount, int sideLength) {
+	_normals = new Vec3    [elementCount];
+	_shade   = new uint32_t[elementCount];
+	_counts  = new uint16_t[elementCount];
+
+	_sideLength = sideLength;
+}
+
+void PlyLoader::processBlock(uint32_t *data, int x, int y, int z, int w, int h, int d) {
+	static Triangle query;
+
+	_bufferX = x;
+	_bufferY = y;
+	_bufferZ = z;
+	_bufferW = w;
+	_bufferH = h;
+	_bufferD = d;
+
+	size_t elemCount = _bufferW*(_bufferH*(size_t)_bufferD);
+	memset(_normals, 0, elemCount*sizeof(Vec3));
+	memset(_counts,  0, elemCount*sizeof(uint16_t));
+	memset(_shade,   0, elemCount*sizeof(uint32_t));
+	memset(data,     0, elemCount*sizeof(uint32_t));
+
+	query.upper = Vec3(x, y, z)*1.0f/_sideLength;
+	unsigned begin =
+		lower_bound(_tris.begin(), _tris.end(), query, &compareTriangles) - _tris.begin();
+	unsigned end = _tris.size();
+	for (unsigned i = begin; i < end; i++)
+		triangleToVolume(_tris[i]);
+
+	for (size_t i = 0; i < elemCount; i++) {
+		if (_counts[i])
+			data[i] = compressMaterial(_normals[i], _shade[i]/(256.0f*_counts[i]));
+	}
+}
+
+void PlyLoader::teardownBlockProcessing() {
+	delete[] _normals;
+	delete[] _shade;
+	delete[] _counts;
+}
+
+void PlyLoader::suggestedDimensions(int sideLength, int &w, int &h, int &d) {
+	Vec3 sizes = (_upper - _lower)*sideLength;
+	w = (int)sizes.x;
+	h = (int)sizes.y;
+	d = (int)sizes.z;
+}
+
 void PlyLoader::convertToVolume(const char *path, int maxSize, size_t memoryBudget) {
 	FILE *fp = fopen(path, "wb");
 	if (!fp)
 		return;
 
-	Vec3 sizes = (_upper - _lower)*maxSize;
-	int sizeX = (int)sizes.x;
-	int sizeY = (int)sizes.y;
-	int sizeZ = (int)sizes.z;
+	int w, h, d;
+	suggestedDimensions(maxSize, w, h, d);
 
-	printf("Sizes: %d %d %d\n", sizeX, sizeY, sizeZ);
-
-	size_t elementCost = sizeof(Vec3) + sizeof(uint32_t)*2 + sizeof(uint16_t);
-	int sliceZ = memoryBudget/(sizeX*sizeY*elementCost);
-	sliceZ = min(sliceZ, sizeZ);
-
+	size_t sliceCost = blockMemRequirement(w, h, 1);
+	int sliceZ = min((int)(memoryBudget/sliceCost), d);
 	ASSERT(sliceZ != 0, "Not enough memory available for single slice");
-	printf("Slice size: %d  Passes: %d\n", sliceZ, (sizeZ - 1)/sliceZ + 1);
 
-	uint32_t *data;
-	_normals = new Vec3    [sizeX*sizeY*sliceZ];
-	_shade   = new uint32_t[sizeX*sizeY*sliceZ];
-	data     = new uint32_t[sizeX*sizeY*sliceZ];
-	_counts  = new uint16_t[sizeX*sizeY*sliceZ];
+	uint32_t *data = new uint32_t[w*(h*(size_t)sliceZ)];
+	setupBlockProcessing(w*(h*(size_t)sliceZ), maxSize);
 
-	_bufferX = _bufferY = _bufferZ = 0;
-	_bufferW = sizeX;
-	_bufferH = sizeY;
-	_bufferD = sliceZ;
+	fwrite(&w, 4, 1, fp);
+	fwrite(&h, 4, 1, fp);
+	fwrite(&d, 4, 1, fp);
 
-	fwrite(&sizeX, 4, 1, fp);
-	fwrite(&sizeY, 4, 1, fp);
-	fwrite(&sizeZ, 4, 1, fp);
-
-	for (_bufferZ = 0; _bufferZ < sizeZ; _bufferZ += sliceZ) {
-		memset(_normals, 0, sizeX*sizeY*sliceZ*sizeof(Vec3));
-		memset(_shade,   0, sizeX*sizeY*sliceZ*sizeof(uint32_t));
-		memset(data,     0, sizeX*sizeY*sliceZ*sizeof(uint32_t));
-		memset(_counts,  0, sizeX*sizeY*sliceZ*sizeof(uint16_t));
-
-		for (unsigned i = 0; i < _tris.size(); i++)
-			triangleToVolume(_tris[i], maxSize);
-
-		for (int i = 0; i < sizeX*sizeY*sliceZ; i++) {
-			if (_counts[i])
-				data[i] = compressMaterial(_normals[i], _shade[i]/(256.0f*_counts[i]));
-		}
-
-		fwrite(data, sizeof(uint32_t), sizeX*sizeY*min(sliceZ, sizeZ - _bufferZ), fp);
+	for (int z = 0; z < d; z += sliceZ) {
+		processBlock(data, 0, 0, z, w, h, sliceZ);
+		fwrite(data, sizeof(uint32_t), w*(h*(size_t)min(sliceZ, d - z)), fp);
 	}
-
 	fclose(fp);
 
-	delete[] _normals;
-	delete[] _shade;
+	teardownBlockProcessing();
 	delete[] data;
-	delete[] _counts;
 }

@@ -62,6 +62,9 @@ VoxelOctree::VoxelOctree(const char *path) : _voxels(0) {
 		fread(&pointerCount, sizeof(uint32_t), 1, fp);
 		fread(&octreeSize,   sizeof(uint32_t), 1, fp);
 
+		printf("Pointer count: %d\n", pointerCount);
+		printf("Octree size: %d\n", octreeSize);
+
 		_farPointers.resize(pointerCount);
 		_octree     .resize(octreeSize);
 
@@ -120,7 +123,7 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
 				_octree.push_back(_voxels->getVoxel(posX[7 - i], posY[7 - i], posZ[7 - i]));
 	} else {
 		leafs = children;
-		uint32_t childDescriptor = _octree.size();;
+		uint32_t childDescriptor = _octree.size();
 		for (unsigned i = 0; i < BitCount[children]; i++)
 			_octree.push_back(0);
 
@@ -136,7 +139,7 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
 		_octree[descriptorIndex] = (childIndex << 17) | (children << 8) | leafs;
 }
 
-bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float &t) {
+bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_t &normal, float &t) {
 	uint32_t rayStack[MaxScale + 1][2];
 
 	for (int i = 0; i <= MaxScale; i++)
@@ -193,6 +196,11 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, uint32_t &normal, float
 		uint32_t childMasks = current << childShift;
 
 		if ((childMasks & 0x8000) && minT <= maxT) {
+			if (maxTC*rayScale >= scaleExp2) {
+				t = maxTC;
+				return true;
+			}
+
 			float maxTV = min(maxT, maxTC);
 			float half = scaleExp2*0.5f;
 			float centerTX = half*dTx + cornerTX;

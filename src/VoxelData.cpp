@@ -25,12 +25,13 @@ freely, subject to the following restrictions:
 #include <string.h>
 
 #include "VoxelData.hpp"
+#include "PlyLoader.hpp"
 #include "Debug.hpp"
 #include "Util.hpp"
 
 using namespace std;
 
-VoxelData::VoxelData(const char *path, size_t lutMem, size_t dataMem) {
+VoxelData::VoxelData(const char *path, size_t lutMem, size_t dataMem) : _loader(0) {
 	_dataStream = fopen(path, "rb");
 
 	if (_dataStream != NULL) {
@@ -38,37 +39,53 @@ VoxelData::VoxelData(const char *path, size_t lutMem, size_t dataMem) {
 		fread(&_dataH, 4, 1, _dataStream);
 		fread(&_dataD, 4, 1, _dataStream);
 
-		_virtualDataW = roundToPow2(_dataW);
-		_virtualDataH = roundToPow2(_dataH);
-		_virtualDataD = roundToPow2(_dataD);
-		_highestVirtualBit = findHighestBit(max(_virtualDataW, max(_virtualDataH, _virtualDataD)));
-
-		_maxDataMemory = dataMem;
-		_maxLutMemory  = lutMem;
-
-		_maxCacheableSize = 1;
-		while (_maxCacheableSize*_maxCacheableSize*_maxCacheableSize*8ULL*sizeof(uint32_t) < _maxDataMemory)
-			_maxCacheableSize <<= 1;
-
-		_lut = new uint8_t[_maxLutMemory];
-		memset(_lut, 0, _maxLutMemory);
-
-		_lutLevels = 0;
-
-		_bufferedData = new uint32_t[_maxDataMemory/sizeof(uint32_t)];
-		memset(_bufferedData, 0, _maxDataMemory);
-
-		_bufferX = _bufferY = _bufferZ = _bufferW = _bufferH = _bufferD = 0;
-
+		init(lutMem, dataMem);
 		precalcLut();
 	}
+}
+
+VoxelData::VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t dataMem) :
+		_dataStream(0), _loader(loader) {
+
+	loader->suggestedDimensions(sideLength, _dataW, _dataH, _dataD);
+	init(lutMem, dataMem);
+	loader->setupBlockProcessing(_maxCacheableSize*_maxCacheableSize*_maxCacheableSize, sideLength);
+	precalcLut();
 }
 
 VoxelData::~VoxelData() {
 	delete[] _lut;
 	delete[] _bufferedData;
 
-	fclose(_dataStream);
+	if (_dataStream)
+		fclose(_dataStream);
+	else if (_loader)
+		_loader->teardownBlockProcessing();
+}
+
+void VoxelData::init(size_t lutMem, size_t dataMem) {
+	_virtualDataW = roundToPow2(_dataW);
+	_virtualDataH = roundToPow2(_dataH);
+	_virtualDataD = roundToPow2(_dataD);
+	_highestVirtualBit = findHighestBit(max(_virtualDataW, max(_virtualDataH, _virtualDataD)));
+
+	_maxDataMemory = dataMem;
+	_maxLutMemory  = lutMem;
+
+	_cellCost = sizeof(uint32_t);
+	if (_loader)
+		_cellCost += _loader->blockMemRequirement(1, 1, 1);
+
+	_maxCacheableSize = 1;
+	while (_maxCacheableSize*_maxCacheableSize*_maxCacheableSize*8*_cellCost < _maxDataMemory)
+		_maxCacheableSize <<= 1;
+
+	allocateLut();
+
+	_bufferedData = new uint32_t[_maxDataMemory/sizeof(uint32_t)];
+	memset(_bufferedData, 0, _maxDataMemory);
+
+	_bufferX = _bufferY = _bufferZ = _bufferW = _bufferH = _bufferD = 0;
 }
 
 int VoxelData::sideLength() const {
@@ -92,7 +109,7 @@ void VoxelData::prepareDataAccess(int x, int y, int z, int size) {
 			return;
 
 	uint64_t dataSize = width*height*depth;
-	if (dataSize*sizeof(uint32_t) <= _maxDataMemory) {
+	if (dataSize*_cellCost <= _maxDataMemory) {
 		cacheData(x, y, z, width, height, depth);
 
 		_bufferX = x;
@@ -104,8 +121,26 @@ void VoxelData::prepareDataAccess(int x, int y, int z, int size) {
 	}
 }
 
-uint8_t &VoxelData::getLut(int l, int x, int y, int z) {
-	return _levelTable[l][x + ((size_t)y << l) + ((size_t)z << 2*l)];
+void VoxelData::allocateLut() {
+	size_t currentReq =  1;
+	size_t totalReq   =  0;
+	_lutLevels        = -1;
+
+	vector<size_t> indices;
+	while (totalReq + currentReq <= _maxLutMemory && _lutLevels < _highestVirtualBit) {
+		_lutLevels++;
+		indices.push_back(totalReq);
+		totalReq += currentReq;
+		currentReq *= 8;
+	}
+
+	_minLutStep = max(_virtualDataW, max(_virtualDataH, _virtualDataD)) >> _lutLevels;
+
+	_lut = new uint8_t[totalReq];
+	memset(_lut, 0, totalReq);
+
+	for (unsigned i = 0; i < indices.size(); i++)
+		_levelTable.push_back(&_lut[indices[i]]);
 }
 
 void VoxelData::buildBlockLut(int cx, int cy, int cz) {
@@ -140,19 +175,6 @@ void VoxelData::upsampleLutLevel(int l) {
 }
 
 void VoxelData::precalcLut() {
-	size_t currentReq =  1;
-	size_t totalReq   =  0;
-	_lutLevels        = -1;
-
-	while (totalReq + currentReq <= _maxLutMemory && _lutLevels < _highestVirtualBit) {
-		_lutLevels++;
-		_levelTable.push_back(&_lut[totalReq]);
-		totalReq += currentReq;
-		currentReq *= 8;
-	}
-
-	_minLutStep = max(_virtualDataW, max(_virtualDataH, _virtualDataD)) >> _lutLevels;
-
 	for (int z = 0; z < _virtualDataD; z += _maxCacheableSize)
 		for (int y = 0; y < _virtualDataH; y += _maxCacheableSize)
 			for (int x = 0; x < _virtualDataW; x += _maxCacheableSize)
@@ -160,6 +182,10 @@ void VoxelData::precalcLut() {
 
 	for (int i = _lutLevels - 1; i >= 0; i--)
 		upsampleLutLevel(i);
+}
+
+uint8_t &VoxelData::getLut(int l, int x, int y, int z) {
+	return _levelTable[l][x + ((size_t)y << l) + ((size_t)z << 2*l)];
 }
 
 bool VoxelData::cubeContainsVoxels(int x, int y, int z, int size) {
@@ -187,6 +213,11 @@ bool VoxelData::cubeContainsVoxelsRaw(int x, int y, int z, int size) {
 }
 
 void VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
+	if (_loader) {
+		_loader->processBlock(_bufferedData, x, y, z, w, h, d);
+		return;
+	}
+
 	uint64_t zStride = _dataH*(uint64_t)_dataW;
 	uint64_t yStride = (uint64_t)_dataW;
 	uint64_t offsetZ = z*zStride;
@@ -195,8 +226,8 @@ void VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
 	uint64_t baseOffset = (offsetX + offsetY + offsetZ)*sizeof(uint32_t) + 3*sizeof(uint32_t);
 	uint64_t offset = 0;
 
-	for (uint64_t voxelZ = 0; voxelZ < d; voxelZ++) {
-		for (uint64_t voxelY = 0; voxelY < h; voxelY++) {
+	for (uint64_t voxelZ = 0; voxelZ < (unsigned)d; voxelZ++) {
+		for (uint64_t voxelY = 0; voxelY < (unsigned)h; voxelY++) {
 			fseeko64(_dataStream, baseOffset + offset, SEEK_SET);
 			fread(_bufferedData + (voxelY + voxelZ*h)*w, sizeof(uint32_t), w, _dataStream);
 

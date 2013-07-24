@@ -30,8 +30,11 @@ freely, subject to the following restrictions:
 
 #include "math/Vec3.hpp"
 
+class PlyLoader;
+
 class VoxelData {
 	FILE *_dataStream;
+	PlyLoader *_loader;
 
 	int _dataW;
 	int _dataH;
@@ -47,6 +50,8 @@ class VoxelData {
 	size_t _maxLutMemory;
 	size_t _maxCacheableSize;
 
+	size_t _cellCost;
+
 	uint8_t *_lut;
 	std::vector<uint8_t *> _levelTable;
 	int _minLutStep;
@@ -57,12 +62,16 @@ class VoxelData {
 	int _bufferX, _bufferY, _bufferZ;
 	int _bufferW, _bufferH, _bufferD;
 
-	uint8_t &getLut(int l, int x, int y, int z);
+	void allocateLut();
 	void buildBlockLut(int x, int y, int z);
 	void upsampleLutLevel(int l);
 	void precalcLut();
+	uint8_t &getLut(int l, int x, int y, int z);
+
 	void cacheData(int x, int y, int z, int w, int h, int d);
 	bool cubeContainsVoxelsRaw(int x, int y, int z, int size);
+
+	void init(size_t lutMem, size_t dataMem);
 
 public:
 
@@ -74,6 +83,7 @@ public:
 	void prepareDataAccess(int x, int y, int z, int size);
 
 	VoxelData(const char *path, size_t lutMem, size_t dataMem);
+	VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t dataMem);
 	~VoxelData();
 };
 

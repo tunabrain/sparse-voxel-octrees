@@ -1,0 +1,9 @@
+# Binaries
+*.exe
+*.o
+*.dll
+
+# Models/Voxel files
+*.voxel
+*.ply
+*.dat
