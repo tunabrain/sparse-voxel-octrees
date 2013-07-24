@@ -33,58 +33,58 @@ freely, subject to the following restrictions:
 class PlyLoader;
 
 class VoxelData {
-	FILE *_dataStream;
-	PlyLoader *_loader;
+    FILE *_dataStream;
+    PlyLoader *_loader;
 
-	int _dataW;
-	int _dataH;
-	int _dataD;
+    int _dataW;
+    int _dataH;
+    int _dataD;
 
-	int _virtualDataW;
-	int _virtualDataH;
-	int _virtualDataD;
+    int _virtualDataW;
+    int _virtualDataH;
+    int _virtualDataD;
 
-	int _highestVirtualBit;
+    int _highestVirtualBit;
 
-	size_t _maxDataMemory;
-	size_t _maxLutMemory;
-	size_t _maxCacheableSize;
+    size_t _maxDataMemory;
+    size_t _maxLutMemory;
+    size_t _maxCacheableSize;
 
-	size_t _cellCost;
+    size_t _cellCost;
 
-	uint8_t *_lut;
-	std::vector<uint8_t *> _levelTable;
-	int _minLutStep;
-	int _lutLevels;
+    uint8_t *_lut;
+    std::vector<uint8_t *> _levelTable;
+    int _minLutStep;
+    int _lutLevels;
 
-	uint32_t *_bufferedData;
+    uint32_t *_bufferedData;
 
-	int _bufferX, _bufferY, _bufferZ;
-	int _bufferW, _bufferH, _bufferD;
+    int _bufferX, _bufferY, _bufferZ;
+    int _bufferW, _bufferH, _bufferD;
 
-	void allocateLut();
-	void buildBlockLut(int x, int y, int z);
-	void upsampleLutLevel(int l);
-	void precalcLut();
-	uint8_t &getLut(int l, int x, int y, int z);
+    void allocateLut();
+    void buildBlockLut(int x, int y, int z);
+    void upsampleLutLevel(int l);
+    void precalcLut();
+    uint8_t &getLut(int l, int x, int y, int z);
 
-	void cacheData(int x, int y, int z, int w, int h, int d);
-	bool cubeContainsVoxelsRaw(int x, int y, int z, int size);
+    void cacheData(int x, int y, int z, int w, int h, int d);
+    bool cubeContainsVoxelsRaw(int x, int y, int z, int size);
 
-	void init(size_t lutMem, size_t dataMem);
+    void init(size_t lutMem, size_t dataMem);
 
 public:
 
-	int sideLength() const;
-	Vec3 getCenter() const;
+    int sideLength() const;
+    Vec3 getCenter() const;
 
-	uint32_t getVoxel(int x, int y, int z);
-	bool cubeContainsVoxels(int x, int y, int z, int size);
-	void prepareDataAccess(int x, int y, int z, int size);
+    uint32_t getVoxel(int x, int y, int z);
+    bool cubeContainsVoxels(int x, int y, int z, int size);
+    void prepareDataAccess(int x, int y, int z, int size);
 
-	VoxelData(const char *path, size_t lutMem, size_t dataMem);
-	VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t dataMem);
-	~VoxelData();
+    VoxelData(const char *path, size_t lutMem, size_t dataMem);
+    VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t dataMem);
+    ~VoxelData();
 };
 
 

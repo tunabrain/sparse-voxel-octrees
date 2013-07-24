@@ -32,238 +32,238 @@ freely, subject to the following restrictions:
 using namespace std;
 
 VoxelData::VoxelData(const char *path, size_t lutMem, size_t dataMem) : _loader(0) {
-	_dataStream = fopen(path, "rb");
+    _dataStream = fopen(path, "rb");
 
-	if (_dataStream != NULL) {
-		fread(&_dataW, 4, 1, _dataStream);
-		fread(&_dataH, 4, 1, _dataStream);
-		fread(&_dataD, 4, 1, _dataStream);
+    if (_dataStream != NULL) {
+        fread(&_dataW, 4, 1, _dataStream);
+        fread(&_dataH, 4, 1, _dataStream);
+        fread(&_dataD, 4, 1, _dataStream);
 
-		init(lutMem, dataMem);
-		precalcLut();
-	}
+        init(lutMem, dataMem);
+        precalcLut();
+    }
 }
 
 VoxelData::VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t dataMem) :
-		_dataStream(0), _loader(loader) {
+        _dataStream(0), _loader(loader) {
 
-	loader->suggestedDimensions(sideLength, _dataW, _dataH, _dataD);
-	init(lutMem, dataMem);
-	loader->setupBlockProcessing(_maxCacheableSize*_maxCacheableSize*_maxCacheableSize, sideLength);
-	precalcLut();
+    loader->suggestedDimensions(sideLength, _dataW, _dataH, _dataD);
+    init(lutMem, dataMem);
+    loader->setupBlockProcessing(_maxCacheableSize*_maxCacheableSize*_maxCacheableSize, sideLength);
+    precalcLut();
 }
 
 VoxelData::~VoxelData() {
-	delete[] _lut;
-	delete[] _bufferedData;
+    delete[] _lut;
+    delete[] _bufferedData;
 
-	if (_dataStream)
-		fclose(_dataStream);
-	else if (_loader)
-		_loader->teardownBlockProcessing();
+    if (_dataStream)
+        fclose(_dataStream);
+    else if (_loader)
+        _loader->teardownBlockProcessing();
 }
 
 void VoxelData::init(size_t lutMem, size_t dataMem) {
-	_virtualDataW = roundToPow2(_dataW);
-	_virtualDataH = roundToPow2(_dataH);
-	_virtualDataD = roundToPow2(_dataD);
-	_highestVirtualBit = findHighestBit(max(_virtualDataW, max(_virtualDataH, _virtualDataD)));
+    _virtualDataW = roundToPow2(_dataW);
+    _virtualDataH = roundToPow2(_dataH);
+    _virtualDataD = roundToPow2(_dataD);
+    _highestVirtualBit = findHighestBit(max(_virtualDataW, max(_virtualDataH, _virtualDataD)));
 
-	_maxDataMemory = dataMem;
-	_maxLutMemory  = lutMem;
+    _maxDataMemory = dataMem;
+    _maxLutMemory  = lutMem;
 
-	_cellCost = sizeof(uint32_t);
-	if (_loader)
-		_cellCost += _loader->blockMemRequirement(1, 1, 1);
+    _cellCost = sizeof(uint32_t);
+    if (_loader)
+        _cellCost += _loader->blockMemRequirement(1, 1, 1);
 
-	_maxCacheableSize = 1;
-	while (_maxCacheableSize*_maxCacheableSize*_maxCacheableSize*8*_cellCost < _maxDataMemory)
-		_maxCacheableSize <<= 1;
+    _maxCacheableSize = 1;
+    while (_maxCacheableSize*_maxCacheableSize*_maxCacheableSize*8*_cellCost < _maxDataMemory)
+        _maxCacheableSize <<= 1;
 
-	allocateLut();
+    allocateLut();
 
-	_bufferedData = new uint32_t[_maxDataMemory/sizeof(uint32_t)];
-	memset(_bufferedData, 0, _maxDataMemory);
+    _bufferedData = new uint32_t[_maxDataMemory/sizeof(uint32_t)];
+    memset(_bufferedData, 0, _maxDataMemory);
 
-	_bufferX = _bufferY = _bufferZ = _bufferW = _bufferH = _bufferD = 0;
+    _bufferX = _bufferY = _bufferZ = _bufferW = _bufferH = _bufferD = 0;
 }
 
 int VoxelData::sideLength() const {
-	return max(_virtualDataW, max(_virtualDataH, _virtualDataD));
+    return max(_virtualDataW, max(_virtualDataH, _virtualDataD));
 }
 
 void VoxelData::prepareDataAccess(int x, int y, int z, int size) {
-	int64_t width  = min(size, _dataW - x);
-	int64_t height = min(size, _dataH - y);
-	int64_t depth  = min(size, _dataD - z);
+    int64_t width  = min(size, _dataW - x);
+    int64_t height = min(size, _dataH - y);
+    int64_t depth  = min(size, _dataD - z);
 
-	if (width <= 0 || height <= 0 || depth <= 0)
-		return;
+    if (width <= 0 || height <= 0 || depth <= 0)
+        return;
 
-	if (x >= _bufferX &&
-		y >= _bufferY &&
-		z >= _bufferZ &&
-		x + width  <= _bufferX + _bufferW &&
-		y + height <= _bufferY + _bufferH &&
-		z + depth  <= _bufferZ + _bufferD)
-			return;
+    if (x >= _bufferX &&
+        y >= _bufferY &&
+        z >= _bufferZ &&
+        x + width  <= _bufferX + _bufferW &&
+        y + height <= _bufferY + _bufferH &&
+        z + depth  <= _bufferZ + _bufferD)
+            return;
 
-	uint64_t dataSize = width*height*depth;
-	if (dataSize*_cellCost <= _maxDataMemory) {
-		cacheData(x, y, z, width, height, depth);
+    uint64_t dataSize = width*height*depth;
+    if (dataSize*_cellCost <= _maxDataMemory) {
+        cacheData(x, y, z, width, height, depth);
 
-		_bufferX = x;
-		_bufferY = y;
-		_bufferZ = z;
-		_bufferW = width;
-		_bufferH = height;
-		_bufferD = depth;
-	}
+        _bufferX = x;
+        _bufferY = y;
+        _bufferZ = z;
+        _bufferW = width;
+        _bufferH = height;
+        _bufferD = depth;
+    }
 }
 
 void VoxelData::allocateLut() {
-	size_t currentReq =  1;
-	size_t totalReq   =  0;
-	_lutLevels        = -1;
+    size_t currentReq =  1;
+    size_t totalReq   =  0;
+    _lutLevels        = -1;
 
-	vector<size_t> indices;
-	while (totalReq + currentReq <= _maxLutMemory && _lutLevels < _highestVirtualBit) {
-		_lutLevels++;
-		indices.push_back(totalReq);
-		totalReq += currentReq;
-		currentReq *= 8;
-	}
+    vector<size_t> indices;
+    while (totalReq + currentReq <= _maxLutMemory && _lutLevels < _highestVirtualBit) {
+        _lutLevels++;
+        indices.push_back(totalReq);
+        totalReq += currentReq;
+        currentReq *= 8;
+    }
 
-	_minLutStep = max(_virtualDataW, max(_virtualDataH, _virtualDataD)) >> _lutLevels;
+    _minLutStep = max(_virtualDataW, max(_virtualDataH, _virtualDataD)) >> _lutLevels;
 
-	_lut = new uint8_t[totalReq];
-	memset(_lut, 0, totalReq);
+    _lut = new uint8_t[totalReq];
+    memset(_lut, 0, totalReq);
 
-	for (unsigned i = 0; i < indices.size(); i++)
-		_levelTable.push_back(&_lut[indices[i]]);
+    for (unsigned i = 0; i < indices.size(); i++)
+        _levelTable.push_back(&_lut[indices[i]]);
 }
 
 void VoxelData::buildBlockLut(int cx, int cy, int cz) {
-	prepareDataAccess(cx, cy, cz, _maxCacheableSize);
+    prepareDataAccess(cx, cy, cz, _maxCacheableSize);
 
-	int boundX = cx + _maxCacheableSize, lutX = cx/_minLutStep;
-	int boundY = cy + _maxCacheableSize, lutY = cy/_minLutStep;
-	int boundZ = cz + _maxCacheableSize, lutZ = cz/_minLutStep;
+    int boundX = cx + _maxCacheableSize, lutX = cx/_minLutStep;
+    int boundY = cy + _maxCacheableSize, lutY = cy/_minLutStep;
+    int boundZ = cz + _maxCacheableSize, lutZ = cz/_minLutStep;
 
-	for (int z = cz, lz = lutZ; z < boundZ; z += _minLutStep, lz++)
-		for (int y = cy, ly = lutY; y < boundY; y += _minLutStep, ly++)
-			for (int x = cx, lx = lutX; x < boundX; x += _minLutStep, lx++)
-				getLut(_lutLevels, lx, ly, lz) = cubeContainsVoxelsRaw(x, y, z, _minLutStep);
+    for (int z = cz, lz = lutZ; z < boundZ; z += _minLutStep, lz++)
+        for (int y = cy, ly = lutY; y < boundY; y += _minLutStep, ly++)
+            for (int x = cx, lx = lutX; x < boundX; x += _minLutStep, lx++)
+                getLut(_lutLevels, lx, ly, lz) = cubeContainsVoxelsRaw(x, y, z, _minLutStep);
 }
 
 void VoxelData::upsampleLutLevel(int l) {
-	int size = 2 << l;
+    int size = 2 << l;
 
-	for (int x = 0; x < size; x += 2) {
-		for (int y = 0; y < size; y += 2) {
-			for (int z = 0; z < size; z += 2) {
-				int value =
-					getLut(l + 1, x, y + 0, z + 0) + getLut(l + 1, x + 1, y + 0, z + 0) +
-					getLut(l + 1, x, y + 1, z + 0) + getLut(l + 1, x + 1, y + 1, z + 0) +
-	                getLut(l + 1, x, y + 0, z + 1) + getLut(l + 1, x + 1, y + 0, z + 1) +
-	                getLut(l + 1, x, y + 1, z + 1) + getLut(l + 1, x + 1, y + 1, z + 1);
+    for (int x = 0; x < size; x += 2) {
+        for (int y = 0; y < size; y += 2) {
+            for (int z = 0; z < size; z += 2) {
+                int value =
+                    getLut(l + 1, x, y + 0, z + 0) + getLut(l + 1, x + 1, y + 0, z + 0) +
+                    getLut(l + 1, x, y + 1, z + 0) + getLut(l + 1, x + 1, y + 1, z + 0) +
+                    getLut(l + 1, x, y + 0, z + 1) + getLut(l + 1, x + 1, y + 0, z + 1) +
+                    getLut(l + 1, x, y + 1, z + 1) + getLut(l + 1, x + 1, y + 1, z + 1);
 
-				getLut(l, x >> 1, y >> 1, z >> 1) = (value != 0);
-			}
-		}
-	}
+                getLut(l, x >> 1, y >> 1, z >> 1) = (value != 0);
+            }
+        }
+    }
 }
 
 void VoxelData::precalcLut() {
-	for (int z = 0; z < _virtualDataD; z += _maxCacheableSize)
-		for (int y = 0; y < _virtualDataH; y += _maxCacheableSize)
-			for (int x = 0; x < _virtualDataW; x += _maxCacheableSize)
-				buildBlockLut(x, y, z);
+    for (int z = 0; z < _virtualDataD; z += _maxCacheableSize)
+        for (int y = 0; y < _virtualDataH; y += _maxCacheableSize)
+            for (int x = 0; x < _virtualDataW; x += _maxCacheableSize)
+                buildBlockLut(x, y, z);
 
-	for (int i = _lutLevels - 1; i >= 0; i--)
-		upsampleLutLevel(i);
+    for (int i = _lutLevels - 1; i >= 0; i--)
+        upsampleLutLevel(i);
 }
 
 uint8_t &VoxelData::getLut(int l, int x, int y, int z) {
-	return _levelTable[l][x + ((size_t)y << l) + ((size_t)z << 2*l)];
+    return _levelTable[l][x + ((size_t)y << l) + ((size_t)z << 2*l)];
 }
 
 bool VoxelData::cubeContainsVoxels(int x, int y, int z, int size) {
-	if (x >= _dataW || y >= _dataH || z >= _dataD)
-		return false;
+    if (x >= _dataW || y >= _dataH || z >= _dataD)
+        return false;
 
-	if (size < _minLutStep)
-		return cubeContainsVoxelsRaw(x, y, z, size);
-	else
-		return getLut(_highestVirtualBit - findHighestBit(size), x/size, y/size, z/size);
+    if (size < _minLutStep)
+        return cubeContainsVoxelsRaw(x, y, z, size);
+    else
+        return getLut(_highestVirtualBit - findHighestBit(size), x/size, y/size, z/size);
 }
 
 bool VoxelData::cubeContainsVoxelsRaw(int x, int y, int z, int size) {
-	int boundX = min(x + size, _dataW - 1);
-	int boundY = min(y + size, _dataH - 1);
-	int boundZ = min(z + size, _dataD - 1);
+    int boundX = min(x + size, _dataW - 1);
+    int boundY = min(y + size, _dataH - 1);
+    int boundZ = min(z + size, _dataD - 1);
 
-	for (int cz = z; cz < boundZ; cz++)
-		for (int cy = y; cy < boundY; cy++)
-			for (int cx = x; cx < boundX; cx++)
-				if (getVoxel(cx, cy, cz) != 0)
-					return true;
+    for (int cz = z; cz < boundZ; cz++)
+        for (int cy = y; cy < boundY; cy++)
+            for (int cx = x; cx < boundX; cx++)
+                if (getVoxel(cx, cy, cz) != 0)
+                    return true;
 
-	return false;
+    return false;
 }
 
 void VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
-	if (_loader) {
-		_loader->processBlock(_bufferedData, x, y, z, w, h, d);
-		return;
-	}
+    if (_loader) {
+        _loader->processBlock(_bufferedData, x, y, z, w, h, d);
+        return;
+    }
 
-	uint64_t zStride = _dataH*(uint64_t)_dataW;
-	uint64_t yStride = (uint64_t)_dataW;
-	uint64_t offsetZ = z*zStride;
-	uint64_t offsetY = y*yStride;
-	uint64_t offsetX = x;
-	uint64_t baseOffset = (offsetX + offsetY + offsetZ)*sizeof(uint32_t) + 3*sizeof(uint32_t);
-	uint64_t offset = 0;
+    uint64_t zStride = _dataH*(uint64_t)_dataW;
+    uint64_t yStride = (uint64_t)_dataW;
+    uint64_t offsetZ = z*zStride;
+    uint64_t offsetY = y*yStride;
+    uint64_t offsetX = x;
+    uint64_t baseOffset = (offsetX + offsetY + offsetZ)*sizeof(uint32_t) + 3*sizeof(uint32_t);
+    uint64_t offset = 0;
 
-	for (uint64_t voxelZ = 0; voxelZ < (unsigned)d; voxelZ++) {
-		for (uint64_t voxelY = 0; voxelY < (unsigned)h; voxelY++) {
-			fseeko64(_dataStream, baseOffset + offset, SEEK_SET);
-			fread(_bufferedData + (voxelY + voxelZ*h)*w, sizeof(uint32_t), w, _dataStream);
+    for (uint64_t voxelZ = 0; voxelZ < (unsigned)d; voxelZ++) {
+        for (uint64_t voxelY = 0; voxelY < (unsigned)h; voxelY++) {
+            fseeko64(_dataStream, baseOffset + offset, SEEK_SET);
+            fread(_bufferedData + (voxelY + voxelZ*h)*w, sizeof(uint32_t), w, _dataStream);
 
-			offset += yStride*sizeof(uint32_t);
-		}
+            offset += yStride*sizeof(uint32_t);
+        }
 
-		baseOffset += zStride*sizeof(uint32_t);
-		offset = 0;
-	}
+        baseOffset += zStride*sizeof(uint32_t);
+        offset = 0;
+    }
 }
 
 uint32_t VoxelData::getVoxel(int x, int y, int z) {
-	if (x < 0 || y < 0 || z < 0 || x >= _dataW || y >= _dataH || z >= _dataD)
-		return 0;
+    if (x < 0 || y < 0 || z < 0 || x >= _dataW || y >= _dataH || z >= _dataD)
+        return 0;
 
-	ASSERT(
-		x >= _bufferX && y >= _bufferY && z >= _bufferZ && x < _bufferW + _bufferX &&
-		y < _bufferH + _bufferY && z < _bufferD + _bufferZ,
-		"Non-cached buffer access not supported. "
-		"Call PrepareDataAccess before using this function.\n"
-	);
+    ASSERT(
+        x >= _bufferX && y >= _bufferY && z >= _bufferZ && x < _bufferW + _bufferX &&
+        y < _bufferH + _bufferY && z < _bufferD + _bufferZ,
+        "Non-cached buffer access not supported. "
+        "Call PrepareDataAccess before using this function.\n"
+    );
 
-	size_t cubeX = x - _bufferX;
-	size_t cubeY = y - _bufferY;
-	size_t cubeZ = z - _bufferZ;
+    size_t cubeX = x - _bufferX;
+    size_t cubeY = y - _bufferY;
+    size_t cubeZ = z - _bufferZ;
 
-	cubeZ *= (size_t)_bufferH*(size_t)_bufferW;
-	cubeY *= (size_t)_bufferW;
+    cubeZ *= (size_t)_bufferH*(size_t)_bufferW;
+    cubeY *= (size_t)_bufferW;
 
-	return _bufferedData[cubeX + cubeY + cubeZ];
+    return _bufferedData[cubeX + cubeY + cubeZ];
 }
 
 Vec3 VoxelData::getCenter() const {
-	return Vec3(
-		_dataW*0.5f/sideLength(),
-		_dataH*0.5f/sideLength(),
-		_dataD*0.5f/sideLength()
-	);
+    return Vec3(
+        _dataW*0.5f/sideLength(),
+        _dataH*0.5f/sideLength(),
+        _dataD*0.5f/sideLength()
+    );
 }

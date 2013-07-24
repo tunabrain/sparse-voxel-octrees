@@ -27,18 +27,18 @@ freely, subject to the following restrictions:
 #include <SDL/SDL.h> /* Cannot use forward declaration for thread primitives, unfortunately */
 
 class ThreadBarrier {
-	int _numThreads;
-	volatile int _waitCount;
+    int _numThreads;
+    volatile int _waitCount;
 
-	SDL_mutex *_barrierMutex;
-	SDL_sem *_turnstile1, *_turnstile2;
+    SDL_mutex *_barrierMutex;
+    SDL_sem *_turnstile1, *_turnstile2;
 public:
-	void waitPre();
-	void waitPost();
-	void releaseAll();
+    void waitPre();
+    void waitPost();
+    void releaseAll();
 
-	ThreadBarrier(int numThreads);
-	 ~ThreadBarrier();
+    ThreadBarrier(int numThreads);
+     ~ThreadBarrier();
 };
 
 #endif /* THREADBARRIER_HPP_ */

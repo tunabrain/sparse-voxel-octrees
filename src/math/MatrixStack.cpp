@@ -74,7 +74,7 @@ void MatrixStack::get(StackName n, Mat4 &m) {
         m = _stacks[MODEL_STACK].top().pseudoInvert()*_stacks[VIEW_STACK].top();
         break;
     default:
-    	FAIL("Invalid matrix stack\n");
+        FAIL("Invalid matrix stack\n");
     }
 }
 

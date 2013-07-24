@@ -56,15 +56,15 @@ struct Vec3 {
         return Vec3(x*invSqrt, y*invSqrt, z*invSqrt);
     }
 
-	Vec3 reflect(const Vec3 &n) const {
-		float proj = (n.dot(*this))*2.0f;
-		/* Overloaded operators not defined yet */
-		return Vec3(
-			this->x - n.x*proj,
-			this->y - n.y*proj,
-			this->z - n.z*proj
-		);
-	}
+    Vec3 reflect(const Vec3 &n) const {
+        float proj = (n.dot(*this))*2.0f;
+        /* Overloaded operators not defined yet */
+        return Vec3(
+            this->x - n.x*proj,
+            this->y - n.y*proj,
+            this->z - n.z*proj
+        );
+    }
 
     Vec3 abs() const {
         return Vec3(fabsf(x), fabsf(y), fabsf(z));

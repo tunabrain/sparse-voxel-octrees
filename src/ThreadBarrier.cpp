@@ -26,43 +26,43 @@ freely, subject to the following restrictions:
 #include "ThreadBarrier.hpp"
 
 ThreadBarrier::ThreadBarrier(int numThreads) : _numThreads(numThreads) {
-	_barrierMutex = SDL_CreateMutex();
-	_turnstile1   = SDL_CreateSemaphore(0);
-	_turnstile2   = SDL_CreateSemaphore(0);
-	_waitCount = 0;
+    _barrierMutex = SDL_CreateMutex();
+    _turnstile1   = SDL_CreateSemaphore(0);
+    _turnstile2   = SDL_CreateSemaphore(0);
+    _waitCount = 0;
 }
 
 ThreadBarrier::~ThreadBarrier() {
-	SDL_DestroyMutex(_barrierMutex);
-	SDL_DestroySemaphore(_turnstile1);
-	SDL_DestroySemaphore(_turnstile2);
+    SDL_DestroyMutex(_barrierMutex);
+    SDL_DestroySemaphore(_turnstile1);
+    SDL_DestroySemaphore(_turnstile2);
 }
 
 void ThreadBarrier::waitPre() {
-	SDL_mutexP(_barrierMutex);
-	_waitCount++;
-	if (_waitCount == _numThreads)
-		for (int i = 0; i < _numThreads; i++)
-			SDL_SemPost(_turnstile1);
-	SDL_mutexV(_barrierMutex);
+    SDL_mutexP(_barrierMutex);
+    _waitCount++;
+    if (_waitCount == _numThreads)
+        for (int i = 0; i < _numThreads; i++)
+            SDL_SemPost(_turnstile1);
+    SDL_mutexV(_barrierMutex);
 
-	SDL_SemWait(_turnstile1);
+    SDL_SemWait(_turnstile1);
 }
 
 void ThreadBarrier::waitPost() {
-	SDL_mutexP(_barrierMutex);
-	_waitCount--;
-	if (_waitCount == 0)
-		for (int i = 0; i < _numThreads; i++)
-			SDL_SemPost(_turnstile2);
-	SDL_mutexV(_barrierMutex);
+    SDL_mutexP(_barrierMutex);
+    _waitCount--;
+    if (_waitCount == 0)
+        for (int i = 0; i < _numThreads; i++)
+            SDL_SemPost(_turnstile2);
+    SDL_mutexV(_barrierMutex);
 
-	SDL_SemWait(_turnstile2);
+    SDL_SemWait(_turnstile2);
 }
 
 void ThreadBarrier::releaseAll() {
-	for (int i = 0; i < _numThreads; i++) {
-		SDL_SemPost(_turnstile1);
-		SDL_SemPost(_turnstile2);
-	}
+    for (int i = 0; i < _numThreads; i++) {
+        SDL_SemPost(_turnstile1);
+        SDL_SemPost(_turnstile2);
+    }
 }

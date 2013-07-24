@@ -32,59 +32,59 @@ freely, subject to the following restrictions:
 struct PlyFile;
 
 struct Vertex {
-	Vec3 pos, normal, color;
+    Vec3 pos, normal, color;
 
-	Vertex() {};
-	Vertex(const Vec3 &p, const Vec3 &n, const Vec3 &c) :
-		pos(p), normal(n), color(c) {}
+    Vertex() {};
+    Vertex(const Vec3 &p, const Vec3 &n, const Vec3 &c) :
+        pos(p), normal(n), color(c) {}
 };
 
 struct Triangle {
-	Vertex v1, v2, v3;
-	Vec3 lower, upper;
+    Vertex v1, v2, v3;
+    Vec3 lower, upper;
 
-	bool barycentric(const Vec3 &p, float &lambda1, float &lambda2) const;
+    bool barycentric(const Vec3 &p, float &lambda1, float &lambda2) const;
 
-	Triangle() {};
-	Triangle(const Vertex &_v1, const Vertex &_v2, const Vertex &_v3);
+    Triangle() {};
+    Triangle(const Vertex &_v1, const Vertex &_v2, const Vertex &_v3);
 };
 
 class PlyLoader {
-	std::vector<Vertex> _verts;
-	std::vector<Triangle> _tris;
+    std::vector<Vertex> _verts;
+    std::vector<Triangle> _tris;
 
-	Vec3 _lower, _upper;
+    Vec3 _lower, _upper;
 
-	Vec3 *_normals;
-	uint32_t *_shade;
-	uint16_t *_counts;
-	int _sideLength;
-	int _bufferX, _bufferY, _bufferZ;
-	int _bufferW, _bufferH, _bufferD;
+    Vec3 *_normals;
+    uint32_t *_shade;
+    uint16_t *_counts;
+    int _sideLength;
+    int _bufferX, _bufferY, _bufferZ;
+    int _bufferW, _bufferH, _bufferD;
 
-	void writeTriangleCell(int x, int y, int z, float cx, float cy, float cz, const Triangle &t);
-	void triangleToVolume(const Triangle &t);
+    void writeTriangleCell(int x, int y, int z, float cx, float cy, float cz, const Triangle &t);
+    void triangleToVolume(const Triangle &t);
 
-	void openPly(const char *path, PlyFile *&file);
-	void readVertices(PlyFile *file);
-	void rescaleVertices();
-	void readTriangles(PlyFile *file);
+    void openPly(const char *path, PlyFile *&file);
+    void readVertices(PlyFile *file);
+    void rescaleVertices();
+    void readTriangles(PlyFile *file);
 
 public:
-	PlyLoader(const char *path);
+    PlyLoader(const char *path);
 
-	void suggestedDimensions(int sideLength, int &w, int &h, int &d);
+    void suggestedDimensions(int sideLength, int &w, int &h, int &d);
 
-	size_t blockMemRequirement(int w, int h, int d);
-	void setupBlockProcessing(size_t elementCount, int sideLength);
-	void processBlock(uint32_t *data, int x, int y, int z, int w, int h, int d);
-	void teardownBlockProcessing();
+    size_t blockMemRequirement(int w, int h, int d);
+    void setupBlockProcessing(size_t elementCount, int sideLength);
+    void processBlock(uint32_t *data, int x, int y, int z, int w, int h, int d);
+    void teardownBlockProcessing();
 
-	void convertToVolume(const char *path, int maxSize, size_t memoryBudget);
+    void convertToVolume(const char *path, int maxSize, size_t memoryBudget);
 
-	const std::vector<Triangle> &tris() const {
-		return _tris;
-	}
+    const std::vector<Triangle> &tris() const {
+        return _tris;
+    }
 };
 
 #endif /* OBJLOADER_HPP_ */

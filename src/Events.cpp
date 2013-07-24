@@ -36,110 +36,110 @@ static char keyHit[SDLK_LAST];
 static char keyDown[SDLK_LAST];
 
 static void processEvent(SDL_Event event) {
-	switch (event.type) {
-		case SDL_MOUSEMOTION:
-			mouseX = event.motion.x;
-			mouseY = event.motion.y;
-			mouseXSpeed = event.motion.xrel;
-			mouseYSpeed = event.motion.yrel;
+    switch (event.type) {
+        case SDL_MOUSEMOTION:
+            mouseX = event.motion.x;
+            mouseY = event.motion.y;
+            mouseXSpeed = event.motion.xrel;
+            mouseYSpeed = event.motion.yrel;
 
-			break;
-		case SDL_MOUSEBUTTONDOWN:
-			if (event.button.button == SDL_BUTTON_WHEELUP) {
-				mouseZSpeed = 1;
-				mouseZ     += 1;
-			} else if(event.button.button == SDL_BUTTON_WHEELDOWN) {
-				mouseZSpeed = -1;
-				mouseZ     -=  1;
-			} else if (event.button.button == SDL_BUTTON_LEFT)
-				mouseDown[0] = 1;
-			else if (event.button.button == SDL_BUTTON_RIGHT)
-				mouseDown[1] = 1;
+            break;
+        case SDL_MOUSEBUTTONDOWN:
+            if (event.button.button == SDL_BUTTON_WHEELUP) {
+                mouseZSpeed = 1;
+                mouseZ     += 1;
+            } else if(event.button.button == SDL_BUTTON_WHEELDOWN) {
+                mouseZSpeed = -1;
+                mouseZ     -=  1;
+            } else if (event.button.button == SDL_BUTTON_LEFT)
+                mouseDown[0] = 1;
+            else if (event.button.button == SDL_BUTTON_RIGHT)
+                mouseDown[1] = 1;
 
-			break;
-		case SDL_MOUSEBUTTONUP:
-			if (event.button.button == SDL_BUTTON_LEFT)
-				mouseDown[0] = 0;
-			else if (event.button.button == SDL_BUTTON_RIGHT)
-				mouseDown[1] = 0;
+            break;
+        case SDL_MOUSEBUTTONUP:
+            if (event.button.button == SDL_BUTTON_LEFT)
+                mouseDown[0] = 0;
+            else if (event.button.button == SDL_BUTTON_RIGHT)
+                mouseDown[1] = 0;
 
-			break;
-		case SDL_KEYDOWN:
-			keyHit[event.key.keysym.sym] = 1;
-			keyDown[event.key.keysym.sym] = 1;
+            break;
+        case SDL_KEYDOWN:
+            keyHit[event.key.keysym.sym] = 1;
+            keyDown[event.key.keysym.sym] = 1;
 
-			break;
-		case SDL_KEYUP:
-			keyDown[event.key.keysym.sym] = 0;
+            break;
+        case SDL_KEYUP:
+            keyDown[event.key.keysym.sym] = 0;
 
-			break;
-		case SDL_QUIT:
-			exit(0);
-	}
+            break;
+        case SDL_QUIT:
+            exit(0);
+    }
 }
 
 int WaitEvent() {
-	SDL_Event event;
-	SDL_WaitEvent(&event);
-	processEvent(event);
+    SDL_Event event;
+    SDL_WaitEvent(&event);
+    processEvent(event);
 
-	return event.type;
+    return event.type;
 }
 
 void CheckEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event))
-    	processEvent(event);
+        processEvent(event);
 }
 
 int GetMouseX() {
-	return mouseX;
+    return mouseX;
 }
 
 int GetMouseY() {
-	return mouseY;
+    return mouseY;
 }
 
 int GetMouseZ() {
-	return mouseZ;
+    return mouseZ;
 }
 
 int GetMouseXSpeed() {
-	int Temp = mouseXSpeed;
+    int Temp = mouseXSpeed;
 
-	mouseXSpeed = 0;
+    mouseXSpeed = 0;
 
-	return Temp;
+    return Temp;
 }
 
 int GetMouseYSpeed() {
-	int Temp = mouseYSpeed;
+    int Temp = mouseYSpeed;
 
-	mouseYSpeed = 0;
+    mouseYSpeed = 0;
 
-	return Temp;
+    return Temp;
 }
 
 int GetMouseZSpeed() {
-	int Temp = mouseZSpeed;
+    int Temp = mouseZSpeed;
 
-	mouseZSpeed = 0;
+    mouseZSpeed = 0;
 
-	return Temp;
+    return Temp;
 }
 
 int GetMouseDown(int Button) {
-	return mouseDown[Button];
+    return mouseDown[Button];
 }
 
 int GetKeyHit(int Key) {
-	int Temp = keyHit[Key];
+    int Temp = keyHit[Key];
 
-	keyHit[Key] = 0;
+    keyHit[Key] = 0;
 
-	return Temp;
+    return Temp;
 }
 
 int GetKeyDown(int Key) {
-	return keyDown[Key];
+    return keyDown[Key];
 }
