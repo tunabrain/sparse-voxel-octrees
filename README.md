@@ -1,4 +1,4 @@
-![Fluid](https://raw.github.com/tunabrain/sparse-voxel-octrees/master/Header.png)
+![XYZRGB Dragon](https://raw.github.com/tunabrain/sparse-voxel-octrees/master/Header.png)
 
 Sparse Voxel Octrees
 =========
@@ -26,4 +26,8 @@ Note that due to repository size considerations, the sample octree has poor reso
 Code
 ====
 
-<code>Main.cpp</code> controls application setup, thread spawning and basic rendering (should move this into a different file instead at some point). <code>VoxelOctree.cpp</code> provides routines for octree raymarching as well as generating, saving and loading octrees. It uses <code>VoxelData.cpp</code>, which robustly handles fast access to non-square, non-power-of-two voxel data not completely loaded in memory. The <code>VoxelData</code> class can also pull voxel data directly from <code>PlyLoader.cpp</code>, generating data from triangle meshes on demand, instead of from file, which vastly improves conversion performance due to elimination of file I/O. 
+<code>Main.cpp</code> controls application setup, thread spawning and basic rendering (should move this into a different file instead at some point).
+
+<code>VoxelOctree.cpp</code> provides routines for octree raymarching as well as generating, saving and loading octrees. It uses <code>VoxelData.cpp</code>, which robustly handles fast access to non-square, non-power-of-two voxel data not completely loaded in memory.
+
+The <code>VoxelData</code> class can also pull voxel data directly from <code>PlyLoader.cpp</code>, generating data from triangle meshes on demand, instead of from file, which vastly improves conversion performance due to elimination of file I/O. 

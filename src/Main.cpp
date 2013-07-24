@@ -44,10 +44,10 @@ freely, subject to the following restrictions:
 using namespace std;
 
 /* Number of threads to use - adapt this to your platform for optimal results */
-static const int NumThreads = 20;
+static const int NumThreads = 16;
 /* Screen resolution */
-static const int GWidth  = 800;
-static const int GHeight = 600;
+static const int GWidth  = 1280;
+static const int GHeight = 720;
 
 static const float AspectRatio = GHeight/(float)GWidth;
 static const int TileSize = 8;

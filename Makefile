@@ -17,7 +17,7 @@ endif
 
 MATH_OBJS = Mat4.o Vec3.o Vec4.o MatrixStack.o
 SVO_OBJS = Debug.o Events.o Main.o Util.o VoxelData.o VoxelOctree.o \
-	PlyLoader.o tribox3.o ply/plyfile.o ThreadBarrier.o \
+	PlyLoader.o third-party/tribox3.o third-party/plyfile.o ThreadBarrier.o \
 	$(addprefix math/,$(MATH_OBJS))
 OBJECTS = $(addprefix src/,$(SVO_OBJS))
 
