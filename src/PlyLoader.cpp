@@ -170,15 +170,15 @@ void PlyLoader::readTriangles(PlyFile *file) {
         if (!strcmp(triProps[i]->name, "vertex_indices")) {
             triProps[i]->count_internal = PLY_INT;
             triProps[i]->internal_type = PLY_INT;
-            triProps[i]->offset = sizeof(int);
-            triProps[i]->count_offset = 0;
+            triProps[i]->offset = 0;
+            triProps[i]->count_offset = sizeof(int*);
             ply_get_property(file, "face", triProps[i]);
             break;
         } else if (i == triPropCount - 1)
             FAIL("No face information found\n");
     }
 
-    struct { int count; int *elems; } face;
+    struct { int *elems; int count; } face;
     for (int i = 0; i < triCount; i++) {
         ply_get_element(file, (void *)&face);
 
