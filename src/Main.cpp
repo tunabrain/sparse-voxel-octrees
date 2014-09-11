@@ -75,7 +75,7 @@ Vec3 shade(int intNormal, const Vec3 &ray, const Vec3 &light) {
     float d = max(light.dot(ray.reflect(n)), 0.0f);
     float specular = d*d;
 
-    return c*0.9f + specular*0.2f;
+    return c*0.9f*fabs(light.dot(n)) + specular*0.2f;
 }
 
 void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy, float zz, const Mat4 &tform, const Vec3 &light, VoxelOctree *tree, const Vec3 &pos, float minT) {
