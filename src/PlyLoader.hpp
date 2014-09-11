@@ -50,6 +50,8 @@ struct Triangle {
 };
 
 class PlyLoader {
+    bool _isBigEndian;
+
     std::vector<Vertex> _verts;
     std::vector<Triangle> _tris;
 

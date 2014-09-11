@@ -67,7 +67,7 @@ static bool compareTriangles(const Triangle &a, const Triangle &b) {
     return a.upper.a[largestDim] < b.upper.a[largestDim];
 }
 
-PlyLoader::PlyLoader(const char *path) : _lower(1e30), _upper(-1e30) {
+PlyLoader::PlyLoader(const char *path) : _isBigEndian(false), _lower(1e30), _upper(-1e30) {
     PlyFile *file;
 
     openPly(path, file);
@@ -87,6 +87,8 @@ void PlyLoader::openPly(const char *path, PlyFile *&file) {
     file = ply_open_for_reading(path, &elemCount, &elemNames, &fileType, &version);
 
     ASSERT(file != 0, "Failed to open PLY at %s\n", path);
+    
+    _isBigEndian = (file->file_type == PLY_BINARY_BE);
 
     bool hasVerts = false, hasTris = false;
     for (int i = 0; i < elemCount; i++) {
@@ -99,6 +101,24 @@ void PlyLoader::openPly(const char *path, PlyFile *&file) {
     }
 
     ASSERT(hasVerts && hasTris, "PLY file has to have triangles and vertices\n");
+}
+
+template<typename T>
+T toHostOrder(T src, bool isBigEndian)
+{
+    if (!isBigEndian)
+        return src;
+
+    union {
+        char bytes[sizeof(T)];
+        T type;
+    } srcBytes, dstBytes;
+    
+    srcBytes.type = src;
+    for (size_t i = 0; i < sizeof(T); ++i)
+        dstBytes.bytes[i] = srcBytes.bytes[sizeof(T) - i - 1];
+    
+    return dstBytes.type;
 }
 
 void PlyLoader::readVertices(PlyFile *file) {
@@ -129,7 +149,7 @@ void PlyLoader::readVertices(PlyFile *file) {
         ply_get_element(file, (void *)elemData);
 
         for (int t = 0; t < 9; t++)
-            vertData[t] = (vpAvail[t] ? elemData[t] : vertDefault[t]);
+            vertData[t] = (vpAvail[t] ? toHostOrder(elemData[t], _isBigEndian) : vertDefault[t]);
 
         _verts.push_back(Vertex(
             Vec3(vertData[0], vertData[1], vertData[2]),
@@ -185,10 +205,12 @@ void PlyLoader::readTriangles(PlyFile *file) {
         if (!face.count)
             continue;
 
-        int v0 = face.elems[0], v1 = face.elems[1];
-        for (int i = 2; i < face.count; i++) {
-            _tris.push_back(Triangle(_verts[v0], _verts[v1], _verts[face.elems[i]]));
-            v1 = face.elems[i];
+        int v0 = toHostOrder(face.elems[0], _isBigEndian);
+        int v1 = toHostOrder(face.elems[1], _isBigEndian);
+        for (int t = 2; t < face.count; t++) {
+            int v2 = toHostOrder(face.elems[t], _isBigEndian);
+            _tris.push_back(Triangle(_verts[v0], _verts[v1], _verts[v2]));
+            v1 = v2;
         }
 
         free(face.elems);
