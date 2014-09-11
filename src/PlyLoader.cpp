@@ -133,7 +133,7 @@ void PlyLoader::readVertices(PlyFile *file) {
         for (int t = 0; t < 9; t++) {
             if (!strcmp(vertProps[i]->name, vpNames[t])) {
                 vertProps[i]->internal_type = PLY_FLOAT;
-                vertProps[i]->offset = i*sizeof(float);
+                vertProps[i]->offset = t*sizeof(float);
                 ply_get_property(file, "vertex", vertProps[i]);
                 vpAvail[t] = true;
                 break;
