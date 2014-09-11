@@ -140,10 +140,12 @@ void PlyLoader::readVertices(PlyFile *file) {
             }
         }
     }
+    
+    _hasNormals = vpAvail[3] && vpAvail[4] && vpAvail[5];
 
     float vertData[9], elemData[9];
     float vertDefault[] = {
-        0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 255.0f, 255.0f, 255.0f
     };
     for (int i = 0; i < vertCount; i++) {
         ply_get_element(file, (void *)elemData);
@@ -210,6 +212,12 @@ void PlyLoader::readTriangles(PlyFile *file) {
         for (int t = 2; t < face.count; t++) {
             int v2 = toHostOrder(face.elems[t], _isBigEndian);
             _tris.push_back(Triangle(_verts[v0], _verts[v1], _verts[v2]));
+            if (!_hasNormals) {
+                Vec3 n = (_verts[v1].pos - _verts[v0].pos).cross(_verts[v2].pos - _verts[v0].pos).normalize();
+                _tris.back().v1.normal = n;
+                _tris.back().v2.normal = n;
+                _tris.back().v3.normal = n;
+            }
             v1 = v2;
         }
 
