@@ -198,8 +198,8 @@ int renderLoop(void *threadData) {
             if (GetMouseDown(0) && (mx != 0 || my != 0)) {
                 Mat4 tform;
                 MatrixStack::get(INV_MODELVIEW_STACK, tform);
-                Vec4 x = tform*Vec4(1.0, 0.0, 0.0, 0.0);
-                Vec4 y = tform*Vec4(0.0, -1.0, 0.0, 0.0);
+                Vec4 x = tform*Vec4(-1.0, 0.0, 0.0, 0.0);
+                Vec4 y = tform*Vec4(0.0, 1.0, 0.0, 0.0);
                 Vec3 axis(mx*y.x - my*x.x, mx*y.y - my*x.y, mx*y.z - my*x.z);
                 MatrixStack::mulR(MODEL_STACK, Mat4::rotAxis(axis.normalize(), sqrtf(mx*mx + my*my)));
             } else if (GetMouseDown(1))
@@ -261,6 +261,7 @@ int main(int argc, char *argv[]) {
     VoxelOctree *tree = initScene();
 
     MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0, 0.0, -2.0)));
+    MatrixStack::set(MODEL_STACK, Mat4::scale(Vec3(1.0, 1.0, -1.0)));
 
     SDL_Thread *threads[NumThreads - 1];
     BatchData threadData[NumThreads];
