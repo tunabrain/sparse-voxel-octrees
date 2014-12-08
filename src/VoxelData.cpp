@@ -79,6 +79,7 @@ void VoxelData::init(size_t lutMem, size_t dataMem) {
     _maxCacheableSize = 1;
     while (_maxCacheableSize*_maxCacheableSize*_maxCacheableSize*8*_cellCost < _maxDataMemory)
         _maxCacheableSize <<= 1;
+    _maxCacheableSize = min(_maxCacheableSize, size_t(1 << _highestVirtualBit));
 
     allocateLut();
 
