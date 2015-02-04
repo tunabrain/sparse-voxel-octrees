@@ -249,17 +249,17 @@ void PlyLoader::writeTriangleCell(int x, int y, int z, float cx, float cy, float
 }
 
 void PlyLoader::triangleToVolume(const Triangle &t) {
-    int lx = max((int)(t.lower.x*_sideLength), _bufferX);
-    int ly = max((int)(t.lower.y*_sideLength), _bufferY);
-    int lz = max((int)(t.lower.z*_sideLength), _bufferZ);
-    int ux = min((int)(t.upper.x*_sideLength), _bufferX + _bufferW - 1);
-    int uy = min((int)(t.upper.y*_sideLength), _bufferY + _bufferH - 1);
-    int uz = min((int)(t.upper.z*_sideLength), _bufferZ + _bufferD - 1);
+    int lx = max((int)(t.lower.x*(_sideLength - 2) + 1.0f), _bufferX);
+    int ly = max((int)(t.lower.y*(_sideLength - 2) + 1.0f), _bufferY);
+    int lz = max((int)(t.lower.z*(_sideLength - 2) + 1.0f), _bufferZ);
+    int ux = min((int)(t.upper.x*(_sideLength - 2) + 1.0f), _bufferX + _bufferW - 1);
+    int uy = min((int)(t.upper.y*(_sideLength - 2) + 1.0f), _bufferY + _bufferH - 1);
+    int uz = min((int)(t.upper.z*(_sideLength - 2) + 1.0f), _bufferZ + _bufferD - 1);
 
     if (lx > ux || ly > uy || lz > uz)
         return;
 
-    float hx = 1.0f/_sideLength;
+    float hx = 1.0f/(_sideLength - 2);
     float triVs[][3] = {
         {t.v1.pos.x, t.v1.pos.y, t.v1.pos.z},
         {t.v2.pos.x, t.v2.pos.y, t.v2.pos.z},
@@ -268,11 +268,11 @@ void PlyLoader::triangleToVolume(const Triangle &t) {
     float halfSize[] = {0.5f*hx, 0.5f*hx, 0.5f*hx};
     float center[3];
 
-    center[2] = (lz + 0.5f)*hx;
+    center[2] = (lz - 0.5f)*hx;
     for (int z = lz; z <= uz; z++, center[2] += hx) {
-        center[1] = (ly + 0.5f)*hx;
+        center[1] = (ly - 0.5f)*hx;
         for (int y = ly; y <= uy; y++, center[1] += hx) {
-            center[0] = (lx + 0.5)*hx;
+            center[0] = (lx - 0.5)*hx;
             for (int x = lx; x <= ux; x++, center[0] += hx) {
                 if (triBoxOverlap(center, halfSize, triVs))
                     writeTriangleCell(x, y, z, center[0], center[1], center[2], t);
@@ -331,9 +331,9 @@ void PlyLoader::teardownBlockProcessing() {
 
 void PlyLoader::suggestedDimensions(int sideLength, int &w, int &h, int &d) {
     Vec3 sizes = (_upper - _lower)*sideLength;
-    w = (int)sizes.x;
-    h = (int)sizes.y;
-    d = (int)sizes.z;
+    w = int(sizes.x) + 2;
+    h = int(sizes.y) + 2;
+    d = int(sizes.z) + 2;
 }
 
 void PlyLoader::convertToVolume(const char *path, int maxSize, size_t memoryBudget) {
