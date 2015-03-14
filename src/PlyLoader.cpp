@@ -226,7 +226,7 @@ void PlyLoader::readTriangles(PlyFile *file) {
 }
 
 void PlyLoader::writeTriangleCell(int x, int y, int z, float cx, float cy, float cz, const Triangle &t) {
-    size_t idx = (x - _bufferX) + _bufferW*(y - _bufferY + _bufferH*(z - _bufferZ));
+    size_t idx = (x - _bufferX) + size_t(_bufferW)*(y - _bufferY + size_t(_bufferH)*(z - _bufferZ));
 
     float lambda1, lambda2, lambda3;
     if (!t.barycentric(Vec3(cx, cy, cz), lambda1, lambda2)) {
@@ -283,7 +283,7 @@ void PlyLoader::triangleToVolume(const Triangle &t) {
 
 size_t PlyLoader::blockMemRequirement(int w, int h, int d) {
     size_t elementCost = sizeof(Vec3) + sizeof(uint32_t) + sizeof(uint16_t);
-    return ((w*elementCost)*h)*d;
+    return elementCost*size_t(w)*size_t(h)*size_t(d);
 }
 
 void PlyLoader::setupBlockProcessing(size_t elementCount, int sideLength) {
@@ -304,17 +304,17 @@ void PlyLoader::processBlock(uint32_t *data, int x, int y, int z, int w, int h, 
     _bufferH = h;
     _bufferD = d;
 
-    size_t elemCount = _bufferW*(_bufferH*(size_t)_bufferD);
+    size_t elemCount = size_t(_bufferW)*size_t(_bufferH)*size_t(_bufferD);
     memset(_normals, 0, elemCount*sizeof(Vec3));
     memset(_counts,  0, elemCount*sizeof(uint16_t));
     memset(_shade,   0, elemCount*sizeof(uint32_t));
     memset(data,     0, elemCount*sizeof(uint32_t));
 
-    unsigned begin =
     query.upper = Vec3(float(x), float(y), float(z))*1.0f/float(_sideLength);
+    int64_t begin =
         lower_bound(_tris.begin(), _tris.end(), query, &compareTriangles) - _tris.begin();
-    unsigned end = _tris.size();
-    for (unsigned i = begin; i < end; i++)
+    int64_t end = _tris.size();
+    for (int64_t i = begin; i < end; i++)
         triangleToVolume(_tris[i]);
 
     for (size_t i = 0; i < elemCount; i++) {
@@ -348,8 +348,8 @@ void PlyLoader::convertToVolume(const char *path, int maxSize, size_t memoryBudg
     int sliceZ = min((int)(memoryBudget/sliceCost), d);
     ASSERT(sliceZ != 0, "Not enough memory available for single slice");
 
-    uint32_t *data = new uint32_t[w*(h*(size_t)sliceZ)];
-    setupBlockProcessing(w*(h*(size_t)sliceZ), maxSize);
+    uint32_t *data = new uint32_t[size_t(w)*size_t(h)*size_t(sliceZ)];
+    setupBlockProcessing(size_t(w)*size_t(h)*size_t(sliceZ), maxSize);
 
     fwrite(&w, 4, 1, fp);
     fwrite(&h, 4, 1, fp);
@@ -357,7 +357,7 @@ void PlyLoader::convertToVolume(const char *path, int maxSize, size_t memoryBudg
 
     for (int z = 0; z < d; z += sliceZ) {
         processBlock(data, 0, 0, z, w, h, sliceZ);
-        fwrite(data, sizeof(uint32_t), w*(h*(size_t)min(sliceZ, d - z)), fp);
+        fwrite(data, sizeof(uint32_t), size_t(w)*size_t(h)*size_t(min(sliceZ, d - z)), fp);
     }
     fclose(fp);
 

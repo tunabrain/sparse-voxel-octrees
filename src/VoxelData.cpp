@@ -94,9 +94,9 @@ int VoxelData::sideLength() const {
 }
 
 void VoxelData::prepareDataAccess(int x, int y, int z, int size) {
-    int64_t width  = min(size, _dataW - x);
-    int64_t height = min(size, _dataH - y);
-    int64_t depth  = min(size, _dataD - z);
+    int width  = min(size, _dataW - x);
+    int height = min(size, _dataH - y);
+    int depth  = min(size, _dataD - z);
 
     if (width <= 0 || height <= 0 || depth <= 0)
         return;
@@ -109,7 +109,7 @@ void VoxelData::prepareDataAccess(int x, int y, int z, int size) {
         z + depth  <= _bufferZ + _bufferD)
             return;
 
-    uint64_t dataSize = width*height*depth;
+    uint64_t dataSize = uint64_t(width)*uint64_t(height)*uint64_t(depth);
     if (dataSize*_cellCost <= _maxDataMemory) {
         cacheData(x, y, z, width, height, depth);
 
@@ -145,11 +145,11 @@ void VoxelData::allocateLut() {
 }
 
 void VoxelData::buildBlockLut(int cx, int cy, int cz) {
-    prepareDataAccess(cx, cy, cz, _maxCacheableSize);
+    prepareDataAccess(cx, cy, cz, int(_maxCacheableSize));
 
-    int boundX = cx + _maxCacheableSize, lutX = cx/_minLutStep;
-    int boundY = cy + _maxCacheableSize, lutY = cy/_minLutStep;
-    int boundZ = cz + _maxCacheableSize, lutZ = cz/_minLutStep;
+    int boundX = cx + int(_maxCacheableSize), lutX = cx/_minLutStep;
+    int boundY = cy + int(_maxCacheableSize), lutY = cy/_minLutStep;
+    int boundZ = cz + int(_maxCacheableSize), lutZ = cz/_minLutStep;
 
     for (int z = cz, lz = lutZ; z < boundZ; z += _minLutStep, lz++)
         for (int y = cy, ly = lutY; y < boundY; y += _minLutStep, ly++)
@@ -176,9 +176,9 @@ void VoxelData::upsampleLutLevel(int l) {
 }
 
 void VoxelData::precalcLut() {
-    for (int z = 0; z < _virtualDataD; z += _maxCacheableSize)
-        for (int y = 0; y < _virtualDataH; y += _maxCacheableSize)
-            for (int x = 0; x < _virtualDataW; x += _maxCacheableSize)
+    for (int z = 0; z < _virtualDataD; z += int(_maxCacheableSize))
+        for (int y = 0; y < _virtualDataH; y += int(_maxCacheableSize))
+            for (int x = 0; x < _virtualDataW; x += int(_maxCacheableSize))
                 buildBlockLut(x, y, z);
 
     for (int i = _lutLevels - 1; i >= 0; i--)

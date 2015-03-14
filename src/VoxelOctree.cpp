@@ -79,8 +79,8 @@ void VoxelOctree::save(const char *path) {
     FILE* fp = fopen(path, "wb");
 
     if (fp) {
-        uint32_t pointerCount = _farPointers.size();
-        uint32_t octreeSize   = _octree.size();
+        uint32_t pointerCount = uint32_t(_farPointers.size());
+        uint32_t octreeSize   = uint32_t(_octree.size());
 
         fwrite(_center.a, sizeof(float), 3, fp);
         fwrite(&pointerCount, sizeof(uint32_t), 1, fp);
@@ -112,7 +112,7 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
         if (_voxels->cubeContainsVoxels(posX[i], posY[i], posZ[i], halfSize))
             children |= 128 >> i;
 
-    uint32_t childIndex = _octree.size() - descriptorIndex;
+    uint32_t childIndex = uint32_t(_octree.size()) - descriptorIndex;
 
     uint8_t leafs;
     if (halfSize == 1) {
@@ -123,7 +123,7 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
                 _octree.push_back(_voxels->getVoxel(posX[7 - i], posY[7 - i], posZ[7 - i]));
     } else {
         leafs = children;
-        uint32_t childDescriptor = _octree.size();
+        uint32_t childDescriptor = uint32_t(_octree.size());
         for (unsigned i = 0; i < BitCount[children]; i++)
             _octree.push_back(0);
 
@@ -133,7 +133,7 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
     }
 
     if (childIndex > 0x7FFF) {
-        _octree[descriptorIndex] = (_farPointers.size() << 17) | 0x10000 | (children << 8) | leafs;
+        _octree[descriptorIndex] = (uint32_t(_farPointers.size()) << 17) | 0x10000 | (children << 8) | leafs;
         _farPointers.push_back(childIndex);
     } else
         _octree[descriptorIndex] = (childIndex << 17) | (children << 8) | leafs;
