@@ -49,7 +49,7 @@ VoxelData::VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t da
 
     loader->suggestedDimensions(sideLength, _dataW, _dataH, _dataD);
     init(lutMem, dataMem);
-    loader->setupBlockProcessing(_maxCacheableSize*_maxCacheableSize*_maxCacheableSize, sideLength);
+    loader->setupBlockProcessing(dataMem/_cellCost, sideLength);
     precalcLut();
 }
 
