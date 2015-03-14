@@ -53,12 +53,12 @@ void decompressMaterial(uint32_t normal, Vec3 &dst, float &shade) {
     uint32_t c    = (normal & 0x0000007F);
 
     const int mod3[] = {0, 1, 2, 0, 1};
-    dst.a[     face     ] = (sign ? -1.0 : 1.0);
-    dst.a[mod3[face + 1]] = u*4.8852e-4*2.0f - 1.0f;
-    dst.a[mod3[face + 2]] = v*4.8852e-4*2.0f - 1.0f;
+    dst.a[     face     ] = (sign ? -1.0f : 1.0f);
+    dst.a[mod3[face + 1]] = u*4.8852e-4f*2.0f - 1.0f;
+    dst.a[mod3[face + 2]] = v*4.8852e-4f*2.0f - 1.0f;
 
     fastNormalization(dst);
-    shade = c*1.0/127.0f;
+    shade = c*1.0f/127.0f;
 }
 
 float invSqrt(float x) { //Inverse square root as used in Quake III

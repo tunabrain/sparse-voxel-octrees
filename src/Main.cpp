@@ -84,7 +84,7 @@ void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy,
 
     float dy = AspectRatio - y0*scale;
     for (int y = y0; y < y1; y++, dy -= scale) {
-        float dx = -1.0 + x0*scale;
+        float dx = -1.0f + x0*scale;
         for (int x = x0; x < x1; x++, dx += scale) {
             Vec3 dir = Vec3(
                 dx*tform.a11 + dy*tform.a12 + zx,
@@ -127,9 +127,9 @@ void renderBatch(BatchData *data) {
 
     float scale = 2.0f/GWidth;
     float tileScale = TileSize*scale;
-    float planeDist = 1.0/tan(M_PI/6.0f);
+    float planeDist = 1.0f/tan(float(M_PI)/6.0f);
     float zx = planeDist*tform.a13, zy = planeDist*tform.a23, zz = planeDist*tform.a33;
-    float coarseScale = 2.0*TileSize/(planeDist*GHeight);
+    float coarseScale = 2.0f*TileSize/(planeDist*GHeight);
 
     Vec3 light = (tform*Vec3(-1.0, 1.0, -1.0)).normalize();
 
@@ -137,7 +137,7 @@ void renderBatch(BatchData *data) {
 
     float dy = AspectRatio - y0*scale;
     for (int y = 0, idx = 0; y < tilesY; y++, dy -= tileScale) {
-        float dx = -1.0 + x0*scale;
+        float dx = -1.0f + x0*scale;
         for (int x = 0; x < tilesX; x++, dx += tileScale, idx++) {
             Vec3 dir = Vec3(
                 dx*tform.a11 + dy*tform.a12 + zx,
@@ -193,8 +193,8 @@ int renderLoop(void *threadData) {
                 barrier->releaseAll();
             }
 
-            float mx = GetMouseXSpeed();
-            float my = GetMouseYSpeed();
+            float mx = float(GetMouseXSpeed());
+            float my = float(GetMouseYSpeed());
             if (GetMouseDown(0) && (mx != 0 || my != 0)) {
                 Mat4 tform;
                 MatrixStack::get(INV_MODELVIEW_STACK, tform);

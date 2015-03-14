@@ -83,7 +83,7 @@ Mat4 Mat4::scale(const Vec3 &s) {
 }
 
 Mat4 Mat4::rotXYZ(const Vec3 &rot) {
-    Vec3 r = rot*M_PI/180.0f;
+    Vec3 r = rot*float(M_PI)/180.0f;
     float c[] = {cosf(r.x), cosf(r.y), cosf(r.z)};
     float s[] = {sinf(r.x), sinf(r.y), sinf(r.z)};
 
@@ -96,7 +96,7 @@ Mat4 Mat4::rotXYZ(const Vec3 &rot) {
 }
 
 Mat4 Mat4::rotYZX(const Vec3 &rot) {
-    Vec3 r = rot*M_PI/180.0f;
+    Vec3 r = rot*float(M_PI)/180.0f;
     float c[] = {cosf(r.x), cosf(r.y), cosf(r.z)};
     float s[] = {sinf(r.x), sinf(r.y), sinf(r.z)};
 
@@ -109,7 +109,7 @@ Mat4 Mat4::rotYZX(const Vec3 &rot) {
 }
 
 Mat4 Mat4::rotAxis(const Vec3 &axis, float angle) {
-    angle *= M_PI/180.0f;
+    angle *= float(M_PI)/180.0f;
     float s = sinf(angle);
     float c = cosf(angle);
     float c1 = 1.0f - c;
@@ -127,15 +127,15 @@ Mat4 Mat4::rotAxis(const Vec3 &axis, float angle) {
 
 Mat4 Mat4::ortho(float l, float r, float b, float t, float n, float f) {
     return Mat4(
-        2.0/(r-l),       0.0,        0.0, -(r+l)/(r-l),
-              0.0, 2.0/(t-b),        0.0, -(t+b)/(t-b),
-              0.0,       0.0, -2.0/(f-n), -(f+n)/(f-n),
-              0.0,       0.0,        0.0,          1.0
+        2.0f/(r-l),       0.0f,        0.0f, -(r+l)/(r-l),
+              0.0f, 2.0f/(t-b),        0.0f, -(t+b)/(t-b),
+              0.0f,       0.0f, -2.0f/(f-n), -(f+n)/(f-n),
+              0.0f,       0.0f,        0.0f,          1.0f
     );
 }
 
 Mat4 Mat4::perspective(float aov, float ratio, float near, float far) {
-    float t = 1.0f/tanf(aov*(M_PI/360.0f));
+    float t = 1.0f/tanf(aov*(float(M_PI)/360.0f));
     float a = (far + near)/(far - near);
     float b = 2.0f*far*near/(far - near);
     float c = t/ratio;

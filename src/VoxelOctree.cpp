@@ -145,9 +145,9 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_
     float ox = o.x, oy = o.y, oz = o.z;
     float dx = d.x, dy = d.y, dz = d.z;
 
-    if (fabsf(dx) < 1e-4) dx = 1e-4;
-    if (fabsf(dy) < 1e-4) dy = 1e-4;
-    if (fabsf(dz) < 1e-4) dz = 1e-4;
+    if (fabsf(dx) < 1e-4f) dx = 1e-4f;
+    if (fabsf(dy) < 1e-4f) dy = 1e-4f;
+    if (fabsf(dz) < 1e-4f) dz = 1e-4f;
 
     float dTx = 1.0f/-fabsf(dx);
     float dTy = 1.0f/-fabsf(dy);

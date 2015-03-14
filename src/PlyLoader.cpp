@@ -67,7 +67,7 @@ static bool compareTriangles(const Triangle &a, const Triangle &b) {
     return a.upper.a[largestDim] < b.upper.a[largestDim];
 }
 
-PlyLoader::PlyLoader(const char *path) : _isBigEndian(false), _lower(1e30), _upper(-1e30) {
+PlyLoader::PlyLoader(const char *path) : _isBigEndian(false), _lower(1e30f), _upper(-1e30f) {
     PlyFile *file;
 
     openPly(path, file);
@@ -173,7 +173,7 @@ void PlyLoader::rescaleVertices() {
         largestDim = 0;
     else if (diff.y > diff.z)
         largestDim = 1;
-    float factor = 1.0/diff.a[largestDim];
+    float factor = 1.0f/diff.a[largestDim];
 
     for (unsigned i = 0; i < _verts.size(); i++)
         _verts[i].pos = (_verts[i].pos - _lower)*factor;
@@ -272,7 +272,7 @@ void PlyLoader::triangleToVolume(const Triangle &t) {
     for (int z = lz; z <= uz; z++, center[2] += hx) {
         center[1] = (ly - 0.5f)*hx;
         for (int y = ly; y <= uy; y++, center[1] += hx) {
-            center[0] = (lx - 0.5)*hx;
+            center[0] = (lx - 0.5f)*hx;
             for (int x = lx; x <= ux; x++, center[0] += hx) {
                 if (triBoxOverlap(center, halfSize, triVs))
                     writeTriangleCell(x, y, z, center[0], center[1], center[2], t);
@@ -310,8 +310,8 @@ void PlyLoader::processBlock(uint32_t *data, int x, int y, int z, int w, int h, 
     memset(_shade,   0, elemCount*sizeof(uint32_t));
     memset(data,     0, elemCount*sizeof(uint32_t));
 
-    query.upper = Vec3(x, y, z)*1.0f/_sideLength;
     unsigned begin =
+    query.upper = Vec3(float(x), float(y), float(z))*1.0f/float(_sideLength);
         lower_bound(_tris.begin(), _tris.end(), query, &compareTriangles) - _tris.begin();
     unsigned end = _tris.size();
     for (unsigned i = begin; i < end; i++)
@@ -330,7 +330,7 @@ void PlyLoader::teardownBlockProcessing() {
 }
 
 void PlyLoader::suggestedDimensions(int sideLength, int &w, int &h, int &d) {
-    Vec3 sizes = (_upper - _lower)*sideLength;
+    Vec3 sizes = (_upper - _lower)*float(sideLength);
     w = int(sizes.x) + 2;
     h = int(sizes.y) + 2;
     d = int(sizes.z) + 2;
