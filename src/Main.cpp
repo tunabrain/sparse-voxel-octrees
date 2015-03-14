@@ -27,7 +27,6 @@ freely, subject to the following restrictions:
 #include <math.h>
 #include <vector>
 #include <string>
-#include <dirent.h>
 #include <algorithm>
 
 #include "math/MatrixStack.hpp"
