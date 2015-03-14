@@ -57,6 +57,10 @@ int ply_type_size[] = {
 #define OTHER_PROP       0
 #define NAMED_PROP       1
 
+#ifdef _MSC_VER
+#define strdup _strdup
+#endif
+
 
 /* returns 1 if strings are equal, 0 if not */
 int equal_strings(const char *, const char *);
