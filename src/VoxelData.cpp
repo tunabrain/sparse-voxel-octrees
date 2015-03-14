@@ -229,7 +229,11 @@ void VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
 
     for (uint64_t voxelZ = 0; voxelZ < (unsigned)d; voxelZ++) {
         for (uint64_t voxelY = 0; voxelY < (unsigned)h; voxelY++) {
+#ifdef _MSC_VER
+			_fseeki64(_dataStream, baseOffset + offset, SEEK_SET);
+#else
             fseeko64(_dataStream, baseOffset + offset, SEEK_SET);
+#endif
             fread(_bufferedData + (voxelY + voxelZ*h)*w, sizeof(uint32_t), w, _dataStream);
 
             offset += yStride*sizeof(uint32_t);
