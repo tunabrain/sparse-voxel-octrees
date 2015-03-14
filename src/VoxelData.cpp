@@ -196,7 +196,7 @@ bool VoxelData::cubeContainsVoxels(int x, int y, int z, int size) {
     if (size < _minLutStep)
         return cubeContainsVoxelsRaw(x, y, z, size);
     else
-        return getLut(_highestVirtualBit - findHighestBit(size), x/size, y/size, z/size);
+        return getLut(_highestVirtualBit - findHighestBit(size), x/size, y/size, z/size) != 0;
 }
 
 bool VoxelData::cubeContainsVoxelsRaw(int x, int y, int z, int size) {
