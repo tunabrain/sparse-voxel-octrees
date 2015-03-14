@@ -41,6 +41,10 @@ freely, subject to the following restrictions:
 #include "Events.hpp"
 #include "Util.hpp"
 
+#ifndef M_PI
+#define M_PI        3.14159265358979323846
+#endif
+
 using namespace std;
 
 /* Number of threads to use - adapt this to your platform for optimal results */
