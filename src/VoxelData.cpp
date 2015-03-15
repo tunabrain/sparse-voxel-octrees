@@ -49,7 +49,7 @@ VoxelData::VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t da
 
     loader->suggestedDimensions(sideLength, _dataW, _dataH, _dataD);
     init(lutMem, dataMem);
-    loader->setupBlockProcessing(dataMem/_cellCost, sideLength);
+    loader->setupBlockProcessing(_maxCacheableSize*_maxCacheableSize*_maxCacheableSize, sideLength);
     precalcLut();
 }
 
@@ -110,7 +110,7 @@ void VoxelData::prepareDataAccess(int x, int y, int z, int size) {
             return;
 
     uint64_t dataSize = uint64_t(width)*uint64_t(height)*uint64_t(depth);
-    if (dataSize*_cellCost <= _maxDataMemory) {
+    if (dataSize*_cellCost <= _maxDataMemory && size <= _maxCacheableSize) {
         cacheData(x, y, z, width, height, depth);
 
         _bufferX = x;
