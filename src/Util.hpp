@@ -24,19 +24,30 @@ freely, subject to the following restrictions:
 #ifndef UTIL_HPP_
 #define UTIL_HPP_
 
-#include <stdint.h>
 #include "math/Vec3.hpp"
 
-uint32_t compressMaterial(const Vec3 &n, float shade);
-void decompressMaterial(uint32_t normal, Vec3 &dst, float &shade);
+#include "IntTypes.hpp"
+
+uint32 compressMaterial(const Vec3 &n, float shade);
+void decompressMaterial(uint32 normal, Vec3 &dst, float &shade);
 
 float invSqrt(float x);
 void fastNormalization(Vec3 &v);
 
-float uintBitsToFloat(uint32_t i);
-uint32_t floatBitsToUint(float f);
+float uintBitsToFloat(uint32 i);
+uint32 floatBitsToUint(float f);
 
 int roundToPow2(int In);
-int findHighestBit(uint32_t v);
+
+//See http://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
+static inline int findHighestBit(uint32 v) {
+    static const uint32 b[] = {
+        0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000
+    };
+    uint32 r = (v & b[0]) != 0;
+    for (int i = 4; i > 0; i--)
+        r |= ((v & b[i]) != 0) << i;
+    return r;
+}
 
 #endif /* UTIL_H_ */
