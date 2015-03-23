@@ -26,9 +26,11 @@ freely, subject to the following restrictions:
 
 #include <SDL.h> /* Cannot use forward declaration for thread primitives, unfortunately */
 
+#include <atomic>
+
 class ThreadBarrier {
     int _numThreads;
-    volatile int _waitCount;
+    std::atomic<int> _waitCount;
 
     SDL_mutex *_barrierMutex;
     SDL_sem *_turnstile1, *_turnstile2;

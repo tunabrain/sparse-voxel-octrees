@@ -40,8 +40,7 @@ ThreadBarrier::~ThreadBarrier() {
 
 void ThreadBarrier::waitPre() {
     SDL_mutexP(_barrierMutex);
-    _waitCount++;
-    if (_waitCount == _numThreads)
+    if (++_waitCount == _numThreads)
         for (int i = 0; i < _numThreads; i++)
             SDL_SemPost(_turnstile1);
     SDL_mutexV(_barrierMutex);
@@ -51,8 +50,7 @@ void ThreadBarrier::waitPre() {
 
 void ThreadBarrier::waitPost() {
     SDL_mutexP(_barrierMutex);
-    _waitCount--;
-    if (_waitCount == 0)
+    if (--_waitCount == 0)
         for (int i = 0; i < _numThreads; i++)
             SDL_SemPost(_turnstile2);
     SDL_mutexV(_barrierMutex);

@@ -42,6 +42,7 @@ freely, subject to the following restrictions:
 #include <iostream>
 #include <stdio.h>
 #include <cstring>
+#include <atomic>
 #include <memory>
 #include <vector>
 #include <string>
@@ -64,7 +65,7 @@ static const int TileSize = 8;
 static SDL_Surface *backBuffer;
 static ThreadBarrier *barrier;
 
-static volatile bool doTerminate;
+static std::atomic<bool> doTerminate;
 
 struct BatchData {
     int id;
