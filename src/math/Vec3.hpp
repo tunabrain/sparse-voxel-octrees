@@ -25,14 +25,18 @@ freely, subject to the following restrictions:
 #define MATH_VEC3_HPP_
 
 #include <algorithm>
-#include <math.h>
 #include <ostream>
+#include <cmath>
 
 struct Vec3 {
     union {
         struct { float x, y, z; };
         float a[3];
     };
+
+    Vec3() : x(0.0f), y(0.0f), z(0.0f) {}
+    Vec3(float a) : x(a), y(a), z(a) {}
+    Vec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
 
     Vec3 cross(const Vec3 &b) const {
         return Vec3(y*b.z - z*b.y, z*b.x - x*b.z, x*b.y - y*b.x);
@@ -47,11 +51,11 @@ struct Vec3 {
     }
 
     float length() const {
-        return sqrtf(x*x + y*y + z*z);
+        return std::sqrt(x*x + y*y + z*z);
     }
 
     Vec3 normalize() const {
-        float invSqrt = 1.0f/sqrtf(x*x + y*y + z*z);
+        float invSqrt = 1.0f/std::sqrt(x*x + y*y + z*z);
 
         return Vec3(x*invSqrt, y*invSqrt, z*invSqrt);
     }
@@ -64,14 +68,6 @@ struct Vec3 {
             this->y - n.y*proj,
             this->z - n.z*proj
         );
-    }
-
-    Vec3 abs() const {
-        return Vec3(fabsf(x), fabsf(y), fabsf(z));
-    }
-
-    bool isNan() const {
-        return isnan(x) || isnan(y) || isnan(z);
     }
 
     Vec3 &operator+=(const Vec3 &b) {
@@ -116,30 +112,97 @@ struct Vec3 {
         return *this;
     }
 
-    Vec3() : x(0.0), y(0.0), z(0.0) {}
-    Vec3(float a) : x(a), y(a), z(a) {}
-    Vec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
+    Vec3 operator-() const {
+        return Vec3(-x, -y, -z);
+    }
+
+    Vec3 operator+(const Vec3 &b) const {
+        return Vec3(x + b.x, y + b.y, z + b.z);
+    }
+
+    Vec3 operator-(const Vec3 &b) const {
+        return Vec3(x - b.x, y - b.y, z - b.z);
+    }
+
+    Vec3 operator*(const Vec3 &b) const {
+        return Vec3(x*b.x, y*b.y, z*b.z);
+    }
+
+    Vec3 operator/(const Vec3 &b) const {
+        return Vec3(x/b.x, y/b.y, z/b.z);
+    }
+
+    Vec3 operator*(float b) const {
+        return Vec3(x*b, y*b, z*b);
+    }
+
+    Vec3 operator/(float b) const {
+        return Vec3(x/b, y/b, z/b);
+    }
+
+    bool operator>(const Vec3 &b) const {
+        return x > b.x && y > b.y && z > b.z;
+    }
+
+    bool operator<(const Vec3 &b) const {
+        return x < b.x && y < b.y && z < b.z;
+    }
+
+    bool operator>=(const Vec3 &b) const {
+        return x >= b.x && y >= b.y && z >= b.z;
+    }
+
+    bool operator<=(const Vec3 &b) const {
+        return x <= b.x && y <= b.y && z <= b.z;
+    }
+
+    bool operator==(const Vec3 &b) const {
+        return x == b.x && y == b.y && z == b.z;
+    }
+
+    bool operator!=(const Vec3 &b) const {
+        return x != b.x || y != b.y || z != b.z;
+    }
+
+    friend std::ostream &operator<< (std::ostream &stream, const Vec3 &v) {
+        return stream << "(" << v.x << ", " << v.y << ", " << v.z << ")";
+    }
 };
 
-Vec3 operator-(const Vec3 &a);
-Vec3 operator+(const Vec3 &a, const Vec3 &b);
-Vec3 operator-(const Vec3 &a, const Vec3 &b);
-Vec3 operator*(const Vec3 &a, const Vec3 &b);
-Vec3 operator/(const Vec3 &a, const Vec3 &b);
-Vec3 operator*(const Vec3 &a, float b);
-Vec3 operator*(float a, const Vec3 &b);
-Vec3 operator/(const Vec3 &a, float b);
-Vec3 operator/(float a, const Vec3 &b);
-bool operator>(const Vec3 &a, const Vec3 &b);
-bool operator<(const Vec3 &a, const Vec3 &b);
-bool operator>=(const Vec3 &a, const Vec3 &b);
-bool operator<=(const Vec3 &a, const Vec3 &b);
-bool operator==(const Vec3 &a, const Vec3 &b);
-bool operator!=(const Vec3 &a, const Vec3 &b);
+static inline Vec3 operator*(float a, const Vec3 &b) {
+    return Vec3(a*b.x, a*b.y, a*b.z);
+}
 
-Vec3 expf(const Vec3 &v);
-Vec3 powf(const Vec3 &v, float p);
+static inline Vec3 operator/(float a, const Vec3 &b) {
+    return Vec3(a/b.x, a/b.y, a/b.z);
+}
 
-std::ostream &operator<<(std::ostream &os, const Vec3 &v);
+namespace std {
+
+static inline Vec3 fabs(const Vec3 &v) {
+    return Vec3(fabs(v.x), fabs(v.y), fabs(v.z));
+}
+
+static inline bool isnan(const Vec3 &v) {
+    return isnan(v.x) || isnan(v.y) || isnan(v.z);
+}
+
+static inline Vec3 exp(const Vec3 &v) {
+    return Vec3(
+        std::exp(v.x),
+        std::exp(v.y),
+        std::exp(v.z)
+    );
+}
+
+static inline Vec3 pow(const Vec3 &v, float p) {
+    return Vec3(
+        std::pow(v.x, p),
+        std::pow(v.y, p),
+        std::pow(v.z, p)
+    );
+}
+
+}
 
 #endif

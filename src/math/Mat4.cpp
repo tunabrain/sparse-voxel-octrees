@@ -21,13 +21,13 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <math.h>
+#include "Mat4.hpp"
+
+#include <cmath>
 
 #ifndef M_PI
 #define M_PI        3.14159265358979323846
 #endif
-
-#include "Mat4.hpp"
 
 Mat4::Mat4() {
     a12 = a13 = a14 = 0.0f;
@@ -64,28 +64,57 @@ Mat4 Mat4::pseudoInvert() const {
     return rot*trans;
 }
 
+Mat4 Mat4::operator*(const Mat4 &b) const {
+    Mat4 result;
+    for (int i = 0; i < 4; i++)
+        for (int t = 0; t < 4; t++)
+            result.a[i*4 + t] =
+                a[i*4 + 0]*b.a[0*4 + t] +
+                a[i*4 + 1]*b.a[1*4 + t] +
+                a[i*4 + 2]*b.a[2*4 + t] +
+                a[i*4 + 3]*b.a[3*4 + t];
+
+    return result;
+}
+
+Vec3 Mat4::operator*(const Vec3 &b) const {
+    return Vec3(
+        a11*b.x + a12*b.y + a13*b.z + a14,
+        a21*b.x + a22*b.y + a23*b.z + a24,
+        a31*b.x + a32*b.y + a33*b.z + a34
+    );
+}
+
+Vec3 Mat4::transformVector(const Vec3 &b) const {
+    return Vec3(
+        a11*b.x + a12*b.y + a13*b.z,
+        a21*b.x + a22*b.y + a23*b.z,
+        a31*b.x + a32*b.y + a33*b.z
+    );
+}
+
 Mat4 Mat4::translate(const Vec3 &v) {
     return Mat4(
-        1.0, 0.0, 0.0, v.x,
-        0.0, 1.0, 0.0, v.y,
-        0.0, 0.0, 1.0, v.z,
-        0.0, 0.0, 0.0, 1.0
+        1.0f, 0.0f, 0.0f, v.x,
+        0.0f, 1.0f, 0.0f, v.y,
+        0.0f, 0.0f, 1.0f, v.z,
+        0.0f, 0.0f, 0.0f, 1.0f
     );
 }
 
 Mat4 Mat4::scale(const Vec3 &s) {
     return Mat4(
-        s.x, 0.0, 0.0, 0.0,
-        0.0, s.y, 0.0, 0.0,
-        0.0, 0.0, s.z, 0.0,
-        0.0, 0.0, 0.0, 1.0
+         s.x, 0.0f, 0.0f, 0.0f,
+        0.0f,  s.y, 0.0f, 0.0f,
+        0.0f, 0.0f,  s.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
     );
 }
 
 Mat4 Mat4::rotXYZ(const Vec3 &rot) {
     Vec3 r = rot*float(M_PI)/180.0f;
-    float c[] = {cosf(r.x), cosf(r.y), cosf(r.z)};
-    float s[] = {sinf(r.x), sinf(r.y), sinf(r.z)};
+    float c[] = {std::cos(r.x), std::cos(r.y), std::cos(r.z)};
+    float s[] = {std::sin(r.x), std::sin(r.y), std::sin(r.z)};
 
     return Mat4(
         c[1]*c[2], -c[0]*s[2] + s[0]*s[1]*c[2],  s[0]*s[2] + c[0]*s[1]*c[2], 0.0f,
@@ -97,8 +126,8 @@ Mat4 Mat4::rotXYZ(const Vec3 &rot) {
 
 Mat4 Mat4::rotYZX(const Vec3 &rot) {
     Vec3 r = rot*float(M_PI)/180.0f;
-    float c[] = {cosf(r.x), cosf(r.y), cosf(r.z)};
-    float s[] = {sinf(r.x), sinf(r.y), sinf(r.z)};
+    float c[] = {std::cos(r.x), std::cos(r.y), std::cos(r.z)};
+    float s[] = {std::sin(r.x), std::sin(r.y), std::sin(r.z)};
 
     return Mat4(
          c[1]*c[2],  c[0]*c[1]*s[2] - s[0]*s[1], c[0]*s[1] + c[1]*s[0]*s[2], 0.0f,
@@ -110,8 +139,8 @@ Mat4 Mat4::rotYZX(const Vec3 &rot) {
 
 Mat4 Mat4::rotAxis(const Vec3 &axis, float angle) {
     angle *= float(M_PI)/180.0f;
-    float s = sinf(angle);
-    float c = cosf(angle);
+    float s = std::sin(angle);
+    float c = std::cos(angle);
     float c1 = 1.0f - c;
     float x = axis.x;
     float y = axis.y;
@@ -135,16 +164,16 @@ Mat4 Mat4::ortho(float l, float r, float b, float t, float n, float f) {
 }
 
 Mat4 Mat4::perspective(float aov, float ratio, float near, float far) {
-    float t = 1.0f/tanf(aov*(float(M_PI)/360.0f));
+    float t = 1.0f/std::tan(aov*(float(M_PI)/360.0f));
     float a = (far + near)/(far - near);
     float b = 2.0f*far*near/(far - near);
     float c = t/ratio;
 
     return Mat4(
-          c, 0.0,  0.0, 0.0,
-        0.0,   t,  0.0, 0.0,
-        0.0, 0.0,   -a,  -b,
-        0.0, 0.0, -1.0, 0.0
+           c, 0.0f,  0.0f, 0.0f,
+        0.0f,    t,  0.0f, 0.0f,
+        0.0f, 0.0f,    -a,   -b,
+        0.0f, 0.0f, -1.0f, 0.0f
     );
 }
 
@@ -154,40 +183,10 @@ Mat4 Mat4::lookAt(const Vec3 &pos, const Vec3 &fwd, const Vec3 &up) {
     Vec3 u = r.cross(f).normalize();
 
     return Mat4(
-        r.x, u.x, f.x, pos.x,
-        r.y, u.y, f.y, pos.y,
-        r.z, u.z, f.z, pos.z,
-        0.0, 0.0, 0.0,   1.0
+         r.x,  u.x,  f.x, pos.x,
+         r.y,  u.y,  f.y, pos.y,
+         r.z,  u.z,  f.z, pos.z,
+        0.0f, 0.0f, 0.0f,  1.0f
     );
 
-}
-
-Mat4 operator*(const Mat4 &a, const Mat4 &b) {
-    Mat4 result;
-    for (int i = 0; i < 4; i++)
-        for (int t = 0; t < 4; t++)
-            result.a[i*4 + t] =
-                a.a[i*4 + 0]*b.a[0*4 + t] +
-                a.a[i*4 + 1]*b.a[1*4 + t] +
-                a.a[i*4 + 2]*b.a[2*4 + t] +
-                a.a[i*4 + 3]*b.a[3*4 + t];
-
-    return result;
-}
-
-Vec4 operator*(const Mat4 &a, const Vec4 &b) {
-    return Vec4(
-        a.a11*b.x + a.a12*b.y + a.a13*b.z + a.a14*b.w,
-        a.a21*b.x + a.a22*b.y + a.a23*b.z + a.a24*b.w,
-        a.a31*b.x + a.a32*b.y + a.a33*b.z + a.a34*b.w,
-        a.a41*b.x + a.a42*b.y + a.a43*b.z + a.a44*b.w
-    );
-}
-
-Vec3 operator*(const Mat4 &a, const Vec3 &b) {
-    return Vec3(
-        a.a11*b.x + a.a12*b.y + a.a13*b.z + a.a14,
-        a.a21*b.x + a.a22*b.y + a.a23*b.z + a.a24,
-        a.a31*b.x + a.a32*b.y + a.a33*b.z + a.a34
-    );
 }

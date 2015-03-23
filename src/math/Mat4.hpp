@@ -25,7 +25,6 @@ freely, subject to the following restrictions:
 #define MATH_MAT4_HPP_
 
 #include "Vec3.hpp"
-#include "Vec4.hpp"
 
 struct Mat4 {
     union {
@@ -38,14 +37,19 @@ struct Mat4 {
         float a[16];
     };
 
-    Mat4 transpose() const;
-    Mat4 pseudoInvert() const;
-
     Mat4();
     Mat4(float _a11, float _a12, float _a13, float _a14,
          float _a21, float _a22, float _a23, float _a24,
          float _a31, float _a32, float _a33, float _a34,
          float _a41, float _a42, float _a43, float _a44);
+
+    Mat4 transpose() const;
+    Mat4 pseudoInvert() const;
+
+    Mat4 operator*(const Mat4 &b) const;
+    Vec3 operator*(const Vec3 &b) const;
+
+    Vec3 transformVector(const Vec3 &v) const;
 
     static Mat4 translate(const Vec3 &v);
     static Mat4 scale(const Vec3 &s);
@@ -57,9 +61,5 @@ struct Mat4 {
     static Mat4 perspective(float aov, float ratio, float near, float far);
     static Mat4 lookAt(const Vec3 &pos, const Vec3 &fwd, const Vec3 &up);
 };
-
-Mat4 operator*(const Mat4 &a, const Mat4 &b);
-Vec4 operator*(const Mat4 &a, const Vec4 &b);
-Vec3 operator*(const Mat4 &a, const Vec3 &b);
 
 #endif

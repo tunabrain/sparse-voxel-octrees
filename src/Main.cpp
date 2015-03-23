@@ -201,8 +201,8 @@ int renderLoop(void *threadData) {
             if (GetMouseDown(0) && (mx != 0 || my != 0)) {
                 Mat4 tform;
                 MatrixStack::get(INV_MODELVIEW_STACK, tform);
-                Vec4 x = tform*Vec4(-1.0, 0.0, 0.0, 0.0);
-                Vec4 y = tform*Vec4(0.0, 1.0, 0.0, 0.0);
+                Vec3 x = tform.transformVector(Vec3(-1.0f, 0.0f, 0.0f));
+                Vec3 y = tform.transformVector(Vec3( 0.0f, 1.0f, 0.0f));
                 Vec3 axis(mx*y.x - my*x.x, mx*y.y - my*x.y, mx*y.z - my*x.z);
                 MatrixStack::mulR(MODEL_STACK, Mat4::rotAxis(axis.normalize(), sqrtf(mx*mx + my*my)));
             } else if (GetMouseDown(1))
