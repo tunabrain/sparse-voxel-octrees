@@ -257,7 +257,7 @@ VoxelOctree *initScene() {
     return tree;
 }
 
-int main(int argc, char *argv[]) {
+int main(int /*argc*/, char */*argv*/[]) {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_WM_SetCaption("Sparse Voxel Octrees", "Sparse Voxel Octrees");
     backBuffer = SDL_SetVideoMode(GWidth, GHeight, 32, SDL_SWSURFACE);
