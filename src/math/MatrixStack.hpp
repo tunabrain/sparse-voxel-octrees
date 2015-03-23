@@ -24,9 +24,9 @@ freely, subject to the following restrictions:
 #ifndef RENDER_MATRIXSTACK_HPP_
 #define RENDER_MATRIXSTACK_HPP_
 
-#include <stack>
+#include "Mat4.hpp"
 
-#include "math/Mat4.hpp"
+#include <stack>
 
 enum StackName {
     PROJECTION_STACK,

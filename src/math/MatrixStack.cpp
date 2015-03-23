@@ -21,17 +21,15 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <deque>
-
 #include "MatrixStack.hpp"
 #include "Debug.hpp"
 
-using namespace std;
+#include <deque>
 
-stack<Mat4> MatrixStack::_stacks[3] = {
-    stack<Mat4>(deque<Mat4>(1, Mat4())),
-    stack<Mat4>(deque<Mat4>(1, Mat4())),
-    stack<Mat4>(deque<Mat4>(1, Mat4()))
+std::stack<Mat4> MatrixStack::_stacks[3] = {
+    std::stack<Mat4>(std::deque<Mat4>(1, Mat4())),
+    std::stack<Mat4>(std::deque<Mat4>(1, Mat4())),
+    std::stack<Mat4>(std::deque<Mat4>(1, Mat4()))
 };
 
 void MatrixStack::set(StackName n, const Mat4 &m) {
