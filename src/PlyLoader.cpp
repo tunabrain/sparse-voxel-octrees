@@ -390,7 +390,7 @@ void PlyLoader::setupBlockProcessing(int sideLength, int blockW, int blockH, int
     size_t elementCount = size_t(blockW)*size_t(blockH)*size_t(blockD);
     _counts.reset(new uint8[elementCount]);
 
-    _sideLength = sideLength;
+    _sideLength = sideLength - 2;
     _blockW = blockW;
     _blockH = blockH;
     _blockD = blockD;
@@ -453,7 +453,7 @@ void PlyLoader::teardownBlockProcessing() {
 }
 
 void PlyLoader::suggestedDimensions(int sideLength, int &w, int &h, int &d) {
-    Vec3 sizes = (_upper - _lower)*float(sideLength);
+    Vec3 sizes = (_upper - _lower)*float(sideLength - 2);
     w = int(sizes.x) + 2;
     h = int(sizes.y) + 2;
     d = int(sizes.z) + 2;
