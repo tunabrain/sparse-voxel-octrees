@@ -88,7 +88,7 @@ Vec3 shade(int intNormal, const Vec3 &ray, const Vec3 &light) {
 }
 
 void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy, float zz, const Mat4 &tform, const Vec3 &light, VoxelOctree *tree, const Vec3 &pos, float minT) {
-    uint8_t *buffer = (uint8_t *)backBuffer->pixels;
+    uint8 *buffer   = (uint8 *)backBuffer->pixels;
     int pitch       = backBuffer->pitch;
 
     float dy = AspectRatio - y0*scale;
@@ -102,7 +102,7 @@ void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy,
             );
             dir *= invSqrt(dir.x*dir.x + dir.y*dir.y + dir.z*dir.z);
 
-            uint32_t intNormal;
+            uint32 intNormal;
             float t;
             Vec3 col;
             if (tree->raymarch(pos + dir*minT, dir, 0.0f, intNormal, t))
@@ -155,7 +155,7 @@ void renderBatch(BatchData *data) {
             );
             dir *= invSqrt(dir.x*dir.x + dir.y*dir.y + dir.z*dir.z);
 
-            uint32_t intNormal;
+            uint32 intNormal;
             float t;
             Vec3 col;
             if (tree->raymarch(pos, dir, coarseScale, intNormal, t))
