@@ -21,19 +21,17 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <algorithm>
-
 #include "VoxelOctree.hpp"
 #include "VoxelData.hpp"
 #include "Debug.hpp"
 #include "Util.hpp"
 
-using namespace std;
+#include <algorithm>
+#include <iostream>
+#include <stdio.h>
+#include <cmath>
 
-static const uint32_t BitCount[] = {
+static const uint32 BitCount[] = {
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
@@ -53,52 +51,58 @@ static const uint32_t BitCount[] = {
 };
 
 VoxelOctree::VoxelOctree(const char *path) : _voxels(0) {
-    FILE* fp = fopen(path, "rb");
+    FILE *fp = fopen(path, "rb");
 
     if (fp) {
         fread(_center.a, sizeof(float), 3, fp);
+        fread(&_octreeSize, sizeof(uint64), 1, fp);
 
-        int pointerCount, octreeSize;
-        fread(&pointerCount, sizeof(uint32_t), 1, fp);
-        fread(&octreeSize,   sizeof(uint32_t), 1, fp);
+        _octree.reset(new uint32[_octreeSize]);
 
-        printf("Pointer count: %d\n", pointerCount);
-        printf("Octree size: %d\n", octreeSize);
-
-        _farPointers.resize(pointerCount);
-        _octree     .resize(octreeSize);
-
-        fread(&_farPointers[0], sizeof(uint32_t), pointerCount, fp);
-        fread(&_octree[0],      sizeof(uint32_t), octreeSize,   fp);
+        // Work around bug in certain C runtime libraries that choke on freads larger than 4GB
+        const uint64 step = uint64(256)*1024*1024;
+        for (uint64 offset = 0; offset < _octreeSize; offset += step)
+            fread(&_octree[offset], sizeof(uint32), std::min(step, _octreeSize - offset), fp);
 
         fclose(fp);
+
+        std::cout << "Octree size: " << prettyPrintMemory(_octreeSize*sizeof(uint32)) << std::endl;
     }
 }
 
 void VoxelOctree::save(const char *path) {
-    FILE* fp = fopen(path, "wb");
+    FILE *fp = fopen(path, "wb");
 
     if (fp) {
-        uint32_t pointerCount = uint32_t(_farPointers.size());
-        uint32_t octreeSize   = uint32_t(_octree.size());
-
         fwrite(_center.a, sizeof(float), 3, fp);
-        fwrite(&pointerCount, sizeof(uint32_t), 1, fp);
-        fwrite(&octreeSize,   sizeof(uint32_t), 1, fp);
-        fwrite(&_farPointers[0], sizeof(uint32_t), pointerCount, fp);
-        fwrite(&_octree[0],      sizeof(uint32_t), octreeSize,   fp);
+        fwrite(&_octreeSize, sizeof(uint64), 1, fp);
+
+        // Work around bug in certain C runtime libraries that choke on fwrites larger than 4GB
+        const uint64 step = uint64(256)*1024*1024;
+        for (uint64 offset = 0; offset < _octreeSize; offset += step)
+            fwrite(&_octree[offset], sizeof(uint32), std::min(step, _octreeSize - offset), fp);
 
         fclose(fp);
     }
 }
 
-VoxelOctree::VoxelOctree(VoxelData *voxels) : _voxels(voxels) {
-    _octree.push_back(0);
-    buildOctree(0, 0, 0, _voxels->sideLength(), 0);
+VoxelOctree::VoxelOctree(VoxelData *voxels)
+: _voxels(voxels)
+{
+    std::unique_ptr<ChunkedAllocator<uint32>> octreeAllocator(new ChunkedAllocator<uint32>());
+    octreeAllocator->pushBack(0);
+
+    buildOctree(*octreeAllocator, 0, 0, 0, _voxels->sideLength(), 0);
+    (*octreeAllocator)[0] |= 1 << 18;
+
+    _octreeSize = octreeAllocator->size();
+    _octree = octreeAllocator->finalize();
     _center = _voxels->getCenter();
+
+    std::cout << "Octree size: " << prettyPrintMemory(_octreeSize*sizeof(uint32)) << std::endl;
 }
 
-void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptorIndex) {
+uint64 VoxelOctree::buildOctree(ChunkedAllocator<uint32> &allocator, int x, int y, int z, int size, uint64 descriptorIndex) {
     _voxels->prepareDataAccess(x, y, z, size);
 
     int halfSize = size >> 1;
@@ -107,67 +111,98 @@ void VoxelOctree::buildOctree(int x, int y, int z, int size, uint32_t descriptor
     int posY[] = {y + halfSize, y + halfSize, y, y, y + halfSize, y + halfSize, y, y};
     int posZ[] = {z + halfSize, z + halfSize, z + halfSize, z + halfSize, z, z, z, z};
 
-    uint8_t children = 0;
-    for (int i = 0; i < 8; i++)
-        if (_voxels->cubeContainsVoxels(posX[i], posY[i], posZ[i], halfSize))
-            children |= 128 >> i;
+    uint64 childOffset = uint64(allocator.size()) - descriptorIndex;
 
-    uint32_t childIndex = uint32_t(_octree.size()) - descriptorIndex;
-
-    uint8_t leafs;
-    if (halfSize == 1) {
-        leafs = 0;
-
-        for (int i = 0; i < 8; i++)
-            if (children & (1 << i))
-                _octree.push_back(_voxels->getVoxel(posX[7 - i], posY[7 - i], posZ[7 - i]));
-    } else {
-        leafs = children;
-        uint32_t childDescriptor = uint32_t(_octree.size());
-        for (unsigned i = 0; i < BitCount[children]; i++)
-            _octree.push_back(0);
-
-        for (int i = 0; i < 8; i++)
-            if (children & (1 << i))
-                buildOctree(posX[7 - i], posY[7 - i], posZ[7 - i], halfSize, childDescriptor++);
+    int childCount = 0;
+    int childIndices[8];
+    uint32 childMask = 0;
+    for (int i = 0; i < 8; i++) {
+        if (_voxels->cubeContainsVoxelsDestructive(posX[i], posY[i], posZ[i], halfSize)) {
+            childMask |= 128 >> i;
+            childIndices[childCount++] = i;
+        }
     }
 
-    if (childIndex > 0x7FFF) {
-        _octree[descriptorIndex] = (uint32_t(_farPointers.size()) << 17) | 0x10000 | (children << 8) | leafs;
-        _farPointers.push_back(childIndex);
-    } else
-        _octree[descriptorIndex] = (childIndex << 17) | (children << 8) | leafs;
+    bool hasLargeChildren = false;
+    uint32 leafMask;
+    if (halfSize == 1) {
+        leafMask = 0;
+
+        for (int i = 0; i < childCount; i++) {
+            int idx = childIndices[childCount - i - 1];
+            allocator.pushBack(_voxels->getVoxelDestructive(posX[idx], posY[idx], posZ[idx]));
+        }
+    } else {
+        leafMask = childMask;
+        for (int i = 0; i < childCount; i++)
+            allocator.pushBack(0);
+
+        uint64 grandChildOffsets[8];
+        uint64 delta = 0;
+        uint64 insertionCount = allocator.insertionCount();
+        for (int i = 0; i < childCount; i++) {
+            int idx = childIndices[childCount - i - 1];
+            grandChildOffsets[i] = delta + buildOctree(allocator, posX[idx], posY[idx], posZ[idx],
+                halfSize, descriptorIndex + childOffset + i);
+            delta += allocator.insertionCount() - insertionCount;
+            insertionCount = allocator.insertionCount();
+            if (grandChildOffsets[i] > 0x3FFF)
+                hasLargeChildren = true;
+        }
+
+        for (int i = 0; i < childCount; i++) {
+            uint64 childIndex = descriptorIndex + childOffset + i;
+            uint64 offset = grandChildOffsets[i];
+            if (hasLargeChildren) {
+                offset += childCount - i;
+                allocator.insert(childIndex + 1, uint32(offset));
+                allocator[childIndex] |= 0x20000;
+                offset >>= 32;
+            }
+            allocator[childIndex] |= uint32(offset << 18);
+        }
+    }
+
+    allocator[descriptorIndex] = (childMask << 8) | leafMask;
+    if (hasLargeChildren)
+        allocator[descriptorIndex] |= 0x10000;
+
+    return childOffset;
 }
 
-bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_t &normal, float &t) {
-    uint32_t rayStack[MaxScale + 1][2];
+bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32 &normal, float &t) {
+    struct StackEntry {
+        uint64 offset;
+        float maxT;
+    };
+    StackEntry rayStack[MaxScale + 1];
 
     float ox = o.x, oy = o.y, oz = o.z;
     float dx = d.x, dy = d.y, dz = d.z;
 
-    if (fabsf(dx) < 1e-4f) dx = 1e-4f;
-    if (fabsf(dy) < 1e-4f) dy = 1e-4f;
-    if (fabsf(dz) < 1e-4f) dz = 1e-4f;
+    if (std::fabs(dx) < 1e-4f) dx = 1e-4f;
+    if (std::fabs(dy) < 1e-4f) dy = 1e-4f;
+    if (std::fabs(dz) < 1e-4f) dz = 1e-4f;
 
-    float dTx = 1.0f/-fabsf(dx);
-    float dTy = 1.0f/-fabsf(dy);
-    float dTz = 1.0f/-fabsf(dz);
+    float dTx = 1.0f/-std::fabs(dx);
+    float dTy = 1.0f/-std::fabs(dy);
+    float dTz = 1.0f/-std::fabs(dz);
 
     float bTx = dTx*ox;
     float bTy = dTy*oy;
     float bTz = dTz*oz;
 
-    uint8_t octantMask = 7;
+    uint8 octantMask = 7;
     if (dx > 0.0f) octantMask ^= 1, bTx = 3.0f*dTx - bTx;
     if (dy > 0.0f) octantMask ^= 2, bTy = 3.0f*dTy - bTy;
     if (dz > 0.0f) octantMask ^= 4, bTz = 3.0f*dTz - bTz;
 
-    float minT = max(2.0f*dTx - bTx, max(2.0f*dTy - bTy, 2.0f*dTz - bTz));
-    float maxT = min(     dTx - bTx, min(     dTy - bTy,      dTz - bTz));
-    minT = max(minT, 0.0f);
+    float minT = std::max(2.0f*dTx - bTx, std::max(2.0f*dTy - bTy, 2.0f*dTz - bTz));
+    float maxT = std::min(     dTx - bTx, std::min(     dTy - bTy,      dTz - bTz));
+    minT = std::max(minT, 0.0f);
 
-    uint32_t current = 0;
-    uint32_t parent  = 0;
+    uint32 current = 0;
+    uint64 parent  = 0;
     int idx     = 0;
     float posX  = 1.0f;
     float posY  = 1.0f;
@@ -187,10 +222,10 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_
         float cornerTX = posX*dTx - bTx;
         float cornerTY = posY*dTy - bTy;
         float cornerTZ = posZ*dTz - bTz;
-        float maxTC = min(cornerTX, min(cornerTY, cornerTZ));
+        float maxTC = std::min(cornerTX, std::min(cornerTY, cornerTZ));
 
         int childShift = idx ^ octantMask;
-        uint32_t childMasks = current << childShift;
+        uint32 childMasks = current << childShift;
 
         if ((childMasks & 0x8000) && minT <= maxT) {
             if (maxTC*rayScale >= scaleExp2) {
@@ -198,16 +233,16 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_
                 return true;
             }
 
-            float maxTV = min(maxT, maxTC);
+            float maxTV = std::min(maxT, maxTC);
             float half = scaleExp2*0.5f;
             float centerTX = half*dTx + cornerTX;
             float centerTY = half*dTy + cornerTY;
             float centerTZ = half*dTz + cornerTZ;
 
             if (minT <= maxTV) {
-                uint32_t childOffset = current >> 17;
-                if (current & 0x10000)
-                    childOffset = _farPointers[childOffset];
+                uint64 childOffset = current >> 18;
+                if (current & 0x20000)
+                    childOffset = (childOffset << 32) | uint64(_octree[parent + 1]);
 
                 if (!(childMasks & 0x80)) {
                     normal = _octree[childOffset + parent + BitCount[((childMasks >> (8 + childShift)) << childShift) & 127]];
@@ -215,11 +250,13 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_
                     break;
                 }
 
-                rayStack[scale][0] = parent;
-                rayStack[scale][1] = floatBitsToUint(maxT);
+                rayStack[scale].offset = parent;
+                rayStack[scale].maxT = maxT;
 
-                childOffset += BitCount[childMasks & 127];
-                parent      += childOffset;
+                uint32 siblingCount = BitCount[childMasks & 127];
+                parent += childOffset + siblingCount;
+                if (current & 0x10000)
+                    parent += siblingCount;
 
                 idx = 0;
                 scale--;
@@ -252,8 +289,8 @@ bool VoxelOctree::raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_
             scale = (floatBitsToUint((float)differingBits) >> 23) - 127;
             scaleExp2 = uintBitsToFloat((scale - MaxScale + 127) << 23);
 
-            parent = rayStack[scale][0];
-            maxT   = uintBitsToFloat(rayStack[scale][1]);
+            parent = rayStack[scale].offset;
+            maxT   = rayStack[scale].maxT;
 
             int shX = floatBitsToUint(posX) >> scale;
             int shY = floatBitsToUint(posY) >> scale;

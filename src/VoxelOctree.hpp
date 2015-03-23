@@ -24,35 +24,37 @@ freely, subject to the following restrictions:
 #ifndef VOXELOCTREE_HPP_
 #define VOXELOCTREE_HPP_
 
-#include <vector>
-#include <stdint.h>
-
 #include "math/Vec3.hpp"
+
+#include "ChunkedAllocator.hpp"
+#include "IntTypes.hpp"
+
+#include <memory>
+#include <vector>
 
 class VoxelData;
 
 class VoxelOctree {
-    static const int32_t MaxScale = 23;
+    static const int32 MaxScale = 23;
 
-    std::vector<uint32_t> _octree;
-    std::vector<uint32_t> _farPointers;
+    uint64 _octreeSize;
+    std::unique_ptr<uint32[]> _octree;
 
     VoxelData *_voxels;
     Vec3 _center;
 
-    void buildOctree(int x, int y, int z, int size, uint32_t descriptorIndex);
+    uint64 buildOctree(ChunkedAllocator<uint32> &allocator, int x, int y, int z, int size, uint64 descriptorIndex);
 
 public:
+    VoxelOctree(const char *path);
+    VoxelOctree(VoxelData *voxels);
 
     void save(const char *path);
-    bool raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32_t &normal, float &t);
+    bool raymarch(const Vec3 &o, const Vec3 &d, float rayScale, uint32 &normal, float &t);
 
     Vec3 center() const {
         return _center;
     }
-
-    VoxelOctree(const char *path);
-    VoxelOctree(VoxelData *voxels);
 };
 
 #endif /* VOXELOCTREE_HPP_ */

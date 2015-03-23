@@ -21,30 +21,34 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <stdio.h>
-#include <string.h>
-#include <algorithm>
-
 #include "PlyLoader.hpp"
 #include "Debug.hpp"
-#include "third-party/ply.h"
-#include "third-party/tribox3.h"
+#include "Timer.hpp"
 #include "Util.hpp"
 
-using namespace std;
+#include "thread/ThreadUtils.hpp"
+#include "thread/ThreadPool.hpp"
+
+#include "third-party/tribox3.h"
+#include "third-party/ply.h"
+
+#include <algorithm>
+#include <iostream>
+#include <cstring>
+#include <stdio.h>
 
 Triangle::Triangle(const Vertex &_v1, const Vertex &_v2, const Vertex &_v3) :
     v1(_v1), v2(_v2), v3(_v3) {
 
     lower = Vec3(
-        min(v1.pos.x, min(v2.pos.x, v3.pos.x)),
-        min(v1.pos.y, min(v2.pos.y, v3.pos.y)),
-        min(v1.pos.z, min(v2.pos.z, v3.pos.z))
+        std::min(v1.pos.x, std::min(v2.pos.x, v3.pos.x)),
+        std::min(v1.pos.y, std::min(v2.pos.y, v3.pos.y)),
+        std::min(v1.pos.z, std::min(v2.pos.z, v3.pos.z))
     );
     upper = Vec3(
-        max(v1.pos.x, max(v2.pos.x, v3.pos.x)),
-        max(v1.pos.y, max(v2.pos.y, v3.pos.y)),
-        max(v1.pos.z, max(v2.pos.z, v3.pos.z))
+        std::max(v1.pos.x, std::max(v2.pos.x, v3.pos.x)),
+        std::max(v1.pos.y, std::max(v2.pos.y, v3.pos.y)),
+        std::max(v1.pos.z, std::max(v2.pos.z, v3.pos.z))
     );
 }
 
@@ -59,14 +63,6 @@ bool Triangle::barycentric(const Vec3 &p, float &lambda1, float &lambda2) const 
     return lambda1 >= 0.0f && lambda2 >= 0.0f && lambda1 + lambda2 <= 1.0f;
 }
 
-/* Used for sorting the right-most ends of triangles along the largest
- * dimensions for rudimentary triangle culling.
- */
-static int largestDim;
-static bool compareTriangles(const Triangle &a, const Triangle &b) {
-    return a.upper.a[largestDim] < b.upper.a[largestDim];
-}
-
 PlyLoader::PlyLoader(const char *path) : _isBigEndian(false), _lower(1e30f), _upper(-1e30f) {
     PlyFile *file;
 
@@ -76,8 +72,10 @@ PlyLoader::PlyLoader(const char *path) : _isBigEndian(false), _lower(1e30f), _up
     readTriangles(file);
     ply_close(file);
 
-    vector<Vertex>().swap(_verts); /* Get rid of vertex data */
-    sort(_tris.begin(), _tris.end(), &compareTriangles); /* Sort for triangle culling */
+    std::cout << "Triangle count: " << _tris.size() << ", taking up "
+              << prettyPrintMemory(_tris.size()*sizeof(Triangle)) << " of memory" << std::endl;
+
+    std::vector<Vertex>().swap(_verts); /* Get rid of vertex data */
 }
 
 void PlyLoader::openPly(const char *path, PlyFile *&file) {
@@ -160,15 +158,15 @@ void PlyLoader::readVertices(PlyFile *file) {
         ));
 
         for (int t = 0; t < 3; t++) {
-            _lower.a[t] = min(_lower.a[t], vertData[t]);
-            _upper.a[t] = max(_upper.a[t], vertData[t]);
+            _lower.a[t] = std::min(_lower.a[t], vertData[t]);
+            _upper.a[t] = std::max(_upper.a[t], vertData[t]);
         }
     }
 }
 
 void PlyLoader::rescaleVertices() {
     Vec3 diff = _upper - _lower;
-    largestDim = 2;
+    int largestDim = 2;
     if (diff.x > diff.y && diff.x > diff.z)
         largestDim = 0;
     else if (diff.y > diff.z)
@@ -225,13 +223,89 @@ void PlyLoader::readTriangles(PlyFile *file) {
     }
 }
 
-void PlyLoader::writeTriangleCell(int x, int y, int z, float cx, float cy, float cz, const Triangle &t) {
+void PlyLoader::pointToGrid(const Vec3 &p, int &x, int &y, int &z)
+{
+    x = (int)(p.x*(_sideLength - 2) + 1.0f);
+    y = (int)(p.y*(_sideLength - 2) + 1.0f);
+    z = (int)(p.z*(_sideLength - 2) + 1.0f);
+}
+
+template<typename LoopBody>
+void PlyLoader::iterateOverlappingBlocks(const Triangle &t, LoopBody body)
+{
+    int lx, ly, lz;
+    int ux, uy, uz;
+    pointToGrid(t.lower, lx, ly, lz);
+    pointToGrid(t.upper, ux, uy, uz);
+    int lgridX = (lx + 0)/_blockW, lgridY = (ly + 0)/_blockH, lgridZ = (lz + 0)/_blockD;
+    int ugridX = (ux + 1)/_blockW, ugridY = (uy + 1)/_blockH, ugridZ = (uz + 1)/_blockD;
+
+    int maxSide = std::max(ugridX - lgridX, std::max(ugridY - lgridY, ugridZ - lgridZ));
+
+    if (maxSide > 0) {
+        float hx = _blockW/float(_sideLength - 2);
+        float hy = _blockH/float(_sideLength - 2);
+        float hz = _blockD/float(_sideLength - 2);
+        float triVs[][3] = {
+            {t.v1.pos.x, t.v1.pos.y, t.v1.pos.z},
+            {t.v2.pos.x, t.v2.pos.y, t.v2.pos.z},
+            {t.v3.pos.x, t.v3.pos.y, t.v3.pos.z}
+        };
+        float halfSize[] = {0.5f*hx, 0.5f*hy, 0.5f*hz};
+        float center[3];
+
+        center[2] = (lgridZ + 0.5f)*hz;
+        for (int z = lgridZ; z <= ugridZ; ++z, center[2] += hz) {
+            center[1] = (lgridY + 0.5f)*hy;
+            for (int y = lgridY; y <= ugridY; ++y, center[1] += hy) {
+                center[0] = (lgridX + 0.5f)*hx;
+                for (int x = lgridX; x <= ugridX; ++x, center[0] += hx)
+                    if (triBoxOverlap(center, halfSize, triVs))
+                        body(x + _gridW*(y + _gridH*z));
+            }
+        }
+    } else {
+        body(lgridX + _gridW*(lgridY + _gridH*lgridZ));
+    }
+}
+
+void PlyLoader::buildBlockLists()
+{
+    _blockOffsets.resize(_gridW*_gridH*_gridD + 1, 0);
+
+    for (size_t i = 0; i < _tris.size(); ++i)
+        iterateOverlappingBlocks(_tris[i], [&](size_t idx) { _blockOffsets[1 + idx]++; });
+
+    _numNonZeroBlocks = 0;
+    for (size_t i = 1; i < _blockOffsets.size(); ++i)
+        if (_blockOffsets[i])
+            _numNonZeroBlocks++;
+
+    for (size_t i = 1; i < _blockOffsets.size(); ++i)
+        _blockOffsets[i] += _blockOffsets[i - 1];
+
+    _blockLists.reset(new uint32[_blockOffsets.back()]);
+
+    for (size_t i = 0; i < _tris.size(); ++i)
+        iterateOverlappingBlocks(_tris[i], [&](size_t idx) { _blockLists[_blockOffsets[idx]++] = i; });
+
+    for (int i = _blockOffsets.size() - 1; i >= 1; --i)
+        _blockOffsets[i] = _blockOffsets[i - 1];
+    _blockOffsets[0] = 0;
+
+    std::cout << "PlyLoader block lists take up an additional "
+              << prettyPrintMemory((_blockOffsets.size() + _blockOffsets.back())*sizeof(uint32))
+              << " of memory" << std::endl;
+}
+
+void PlyLoader::writeTriangleCell(uint32 *data, int x, int y, int z,
+        float cx, float cy, float cz, const Triangle &t) {
     size_t idx = (x - _bufferX) + size_t(_bufferW)*(y - _bufferY + size_t(_bufferH)*(z - _bufferZ));
 
     float lambda1, lambda2, lambda3;
     if (!t.barycentric(Vec3(cx, cy, cz), lambda1, lambda2)) {
-        lambda1 = min(max(lambda1, 0.0f), 1.0f);
-        lambda2 = min(max(lambda2, 0.0f), 1.0f);
+        lambda1 = std::min(std::max(lambda1, 0.0f), 1.0f);
+        lambda2 = std::min(std::max(lambda2, 0.0f), 1.0f);
         float tau = lambda1 + lambda2;
         if (tau > 1.0f) {
             lambda1 /= tau;
@@ -240,21 +314,44 @@ void PlyLoader::writeTriangleCell(int x, int y, int z, float cx, float cy, float
     }
     lambda3 = 1.0f - lambda1 - lambda2;
 
-    _normals[idx] += (t.v1.normal*lambda1 + t.v2.normal*lambda2 + t.v3.normal*lambda3).normalize();
-
-    /* Only store luminance - we only care about AO anyway */
+    Vec3 normal = (t.v1.normal*lambda1 + t.v2.normal*lambda2 + t.v3.normal*lambda3).normalize();
     Vec3 color = t.v1.color*lambda1 + t.v2.color*lambda2 + t.v3.color*lambda3;
-    _shade  [idx] += (int)color.dot(Vec3(0.2126f, 0.7152f, 0.0722f));
-    _counts [idx]++;
+    /* Only store luminance - we only care about AO anyway */
+    float shade = color.dot(Vec3(0.2126f, 0.7152f, 0.0722f))*(1.0f/256.0f);
+
+    if (data[idx] == 0) {
+        _counts[idx] = 1;
+        data[idx] = compressMaterial(normal, shade);
+    } else {
+        float currentRatio = _counts[idx]/(_counts[idx] + 1.0f);
+        float newRatio = 1.0f - currentRatio;
+
+        Vec3 currentNormal;
+        float currentShade;
+        decompressMaterial(data[idx], currentNormal, currentShade);
+
+        Vec3 newNormal = currentNormal*currentRatio + normal*newRatio;
+        float newShade = currentShade*currentRatio + shade*newRatio;
+        if (newNormal.dot(newNormal) < 1e-3f)
+            newNormal = currentNormal;
+
+        data[idx] = compressMaterial(newNormal, newShade);
+        _counts[idx] = std::min(int(_counts[idx]) + 1, 255);
+    }
 }
 
-void PlyLoader::triangleToVolume(const Triangle &t) {
-    int lx = max((int)(t.lower.x*(_sideLength - 2) + 1.0f), _bufferX);
-    int ly = max((int)(t.lower.y*(_sideLength - 2) + 1.0f), _bufferY);
-    int lz = max((int)(t.lower.z*(_sideLength - 2) + 1.0f), _bufferZ);
-    int ux = min((int)(t.upper.x*(_sideLength - 2) + 1.0f), _bufferX + _bufferW - 1);
-    int uy = min((int)(t.upper.y*(_sideLength - 2) + 1.0f), _bufferY + _bufferH - 1);
-    int uz = min((int)(t.upper.z*(_sideLength - 2) + 1.0f), _bufferZ + _bufferD - 1);
+void PlyLoader::triangleToVolume(uint32 *data, const Triangle &t) {
+    int lx, ly, lz;
+    int ux, uy, uz;
+    pointToGrid(t.lower, lx, ly, lz);
+    pointToGrid(t.upper, ux, uy, uz);
+
+    lx = std::max(lx, _bufferX);
+    ly = std::max(ly, _bufferY);
+    lz = std::max(lz, _bufferZ);
+    ux = std::min(ux, _bufferX + _bufferW - 1);
+    uy = std::min(uy, _bufferY + _bufferH - 1);
+    uz = std::min(uz, _bufferZ + _bufferD - 1);
 
     if (lx > ux || ly > uy || lz > uz)
         return;
@@ -275,28 +372,41 @@ void PlyLoader::triangleToVolume(const Triangle &t) {
             center[0] = (lx - 0.5f)*hx;
             for (int x = lx; x <= ux; x++, center[0] += hx) {
                 if (triBoxOverlap(center, halfSize, triVs))
-                    writeTriangleCell(x, y, z, center[0], center[1], center[2], t);
+                    writeTriangleCell(data, x, y, z, center[0], center[1], center[2], t);
             }
         }
     }
 }
 
 size_t PlyLoader::blockMemRequirement(int w, int h, int d) {
-    size_t elementCost = sizeof(Vec3) + sizeof(uint32_t) + sizeof(uint16_t);
+    size_t elementCost = sizeof(uint8);
     return elementCost*size_t(w)*size_t(h)*size_t(d);
 }
 
-void PlyLoader::setupBlockProcessing(size_t elementCount, int sideLength) {
-    _normals = new Vec3    [elementCount];
-    _shade   = new uint32_t[elementCount];
-    _counts  = new uint16_t[elementCount];
+void PlyLoader::setupBlockProcessing(int sideLength, int blockW, int blockH, int blockD,
+        int volumeW, int volumeH, int volumeD) {
+    _conversionTimer.start();
+
+    size_t elementCount = size_t(blockW)*size_t(blockH)*size_t(blockD);
+    _counts.reset(new uint8[elementCount]);
 
     _sideLength = sideLength;
+    _blockW = blockW;
+    _blockH = blockH;
+    _blockD = blockD;
+    _volumeW = volumeW;
+    _volumeH = volumeH;
+    _volumeD = volumeD;
+    _gridW = (_volumeW + _blockW - 1)/_blockW;
+    _gridH = (_volumeH + _blockH - 1)/_blockH;
+    _gridD = (_volumeD + _blockD - 1)/_blockD;
+
+    _processedBlocks = 0;
+
+    buildBlockLists();
 }
 
-void PlyLoader::processBlock(uint32_t *data, int x, int y, int z, int w, int h, int d) {
-    static Triangle query;
-
+bool PlyLoader::processBlock(uint32 *data, int x, int y, int z, int w, int h, int d) {
     _bufferX = x;
     _bufferY = y;
     _bufferZ = z;
@@ -304,29 +414,42 @@ void PlyLoader::processBlock(uint32_t *data, int x, int y, int z, int w, int h, 
     _bufferH = h;
     _bufferD = d;
 
-    size_t elemCount = size_t(_bufferW)*size_t(_bufferH)*size_t(_bufferD);
-    memset(_normals, 0, elemCount*sizeof(Vec3));
-    memset(_counts,  0, elemCount*sizeof(uint16_t));
-    memset(_shade,   0, elemCount*sizeof(uint32_t));
-    memset(data,     0, elemCount*sizeof(uint32_t));
+    int blockIdx = (x/_blockW) + _gridW*((y/_blockH) + _gridH*(z/_blockD));
+    int start = _blockOffsets[blockIdx];
+    int end   = _blockOffsets[blockIdx + 1];
 
-    query.upper = Vec3(float(x), float(y), float(z))*1.0f/float(_sideLength);
-    int64_t begin =
-        lower_bound(_tris.begin(), _tris.end(), query, &compareTriangles) - _tris.begin();
-    int64_t end = _tris.size();
-    for (int64_t i = begin; i < end; i++)
-        triangleToVolume(_tris[i]);
+    for (int i = start; i < end; ++i)
+        triangleToVolume(data, _tris[_blockLists[i]]);
 
-    for (size_t i = 0; i < elemCount; i++) {
-        if (_counts[i])
-            data[i] = compressMaterial(_normals[i], _shade[i]/(256.0f*_counts[i]));
-    }
+    _processedBlocks++;
+
+    _conversionTimer.stop();
+    double elapsed = _conversionTimer.elapsed();
+
+    std::cout << "Processed block " << _processedBlocks << "/" << _numNonZeroBlocks
+              << " (" << (_processedBlocks*100)/_numNonZeroBlocks << "%) after "
+              << int(elapsed) << " seconds. ";
+    if (_processedBlocks < _numNonZeroBlocks)
+        std::cout << "Approximate time to finish: " << int((_numNonZeroBlocks - _processedBlocks)*elapsed/_processedBlocks)
+                  << " seconds.";
+    else
+        std::cout << "All blocks processed! Post processing...";
+    std::cout << std::endl;
+
+    return false;
+}
+
+bool PlyLoader::isBlockEmpty(int x, int y, int z)
+{
+    int blockIdx = (x/_blockW) + _gridW*((y/_blockH) + _gridH*(z/_blockD));
+    int start = _blockOffsets[blockIdx];
+    int end   = _blockOffsets[blockIdx + 1];
+
+    return start == end;
 }
 
 void PlyLoader::teardownBlockProcessing() {
-    delete[] _normals;
-    delete[] _shade;
-    delete[] _counts;
+    _counts.reset();
 }
 
 void PlyLoader::suggestedDimensions(int sideLength, int &w, int &h, int &d) {
@@ -345,19 +468,22 @@ void PlyLoader::convertToVolume(const char *path, int maxSize, size_t memoryBudg
     suggestedDimensions(maxSize, w, h, d);
 
     size_t sliceCost = blockMemRequirement(w, h, 1);
-    int sliceZ = min((int)(memoryBudget/sliceCost), d);
+    int sliceZ = std::min((int)(memoryBudget/sliceCost), d);
     ASSERT(sliceZ != 0, "Not enough memory available for single slice");
 
-    uint32_t *data = new uint32_t[size_t(w)*size_t(h)*size_t(sliceZ)];
-    setupBlockProcessing(size_t(w)*size_t(h)*size_t(sliceZ), maxSize);
+    uint32 *data = new uint32[size_t(w)*size_t(h)*size_t(sliceZ)];
+    setupBlockProcessing(maxSize, w, h, sliceZ, w, h, d);
 
     fwrite(&w, 4, 1, fp);
     fwrite(&h, 4, 1, fp);
     fwrite(&d, 4, 1, fp);
 
     for (int z = 0; z < d; z += sliceZ) {
-        processBlock(data, 0, 0, z, w, h, sliceZ);
-        fwrite(data, sizeof(uint32_t), size_t(w)*size_t(h)*size_t(min(sliceZ, d - z)), fp);
+        bool blockEmpty = processBlock(data, 0, 0, z, w, h, sliceZ);
+        if (blockEmpty)
+            std::memset(data, 0, size_t(w)*size_t(h)*size_t(sliceZ)*sizeof(uint32));
+
+        fwrite(data, sizeof(uint32), size_t(w)*size_t(h)*size_t(std::min(sliceZ, d - z)), fp);
     }
     fclose(fp);
 

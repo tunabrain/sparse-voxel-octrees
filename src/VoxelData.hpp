@@ -24,11 +24,14 @@ freely, subject to the following restrictions:
 #ifndef VOXELDATA_HPP_
 #define VOXELDATA_HPP_
 
-#include <stdio.h>
-#include <stdint.h>
-#include <vector>
-
 #include "math/Vec3.hpp"
+
+#include "IntTypes.hpp"
+#include "Util.hpp"
+
+#include <stdio.h>
+#include <memory>
+#include <vector>
 
 class PlyLoader;
 
@@ -45,46 +48,99 @@ class VoxelData {
     int _virtualDataD;
 
     int _highestVirtualBit;
+    int _lowLutLevels;
 
-    size_t _maxDataMemory;
-    size_t _maxLutMemory;
     size_t _maxCacheableSize;
 
     size_t _cellCost;
 
-    uint8_t *_lut;
-    std::vector<uint8_t *> _levelTable;
+    std::unique_ptr<uint8[]> _topLut, _lowLut;
+    std::vector<uint8 *> _topTable;
+    std::vector<uint8 *> _lowTable;
     int _minLutStep;
-    int _lutLevels;
+    int _topLutLevels;
 
-    uint32_t *_bufferedData;
+    std::unique_ptr<uint32[]> _bufferedData;
 
     int _bufferX, _bufferY, _bufferZ;
     int _bufferW, _bufferH, _bufferD;
 
-    void allocateLut();
-    void buildBlockLut(int x, int y, int z);
+    template<bool isTop>
     void upsampleLutLevel(int l);
-    void precalcLut();
-    uint8_t &getLut(int l, int x, int y, int z);
+
+    void buildTopLutBlock(int x, int y, int z);
+
+    void buildTopLut();
+    void buildLowLut();
 
     void cacheData(int x, int y, int z, int w, int h, int d);
-    bool cubeContainsVoxelsRaw(int x, int y, int z, int size);
 
-    void init(size_t lutMem, size_t dataMem);
+    void init(size_t mem);
+
+    inline size_t lutIdx(int l, int x, int y, int z) const {
+        return x + ((size_t)y << l) + ((size_t)z << 2*l);
+    }
+
+    inline uint8 &getTopLut(int l, int x, int y, int z) {
+        return _topTable[l][lutIdx(l, x, y, z)];
+    }
+
+    inline uint8 &getLowLut(int l, int x, int y, int z) {
+        return _lowTable[l][lutIdx(l, x, y, z)];
+    }
+
+    template<bool isTop>
+    inline uint8 &getLut(int l, int x, int y, int z)
+    {
+        if (isTop)
+            return getTopLut(l, x, y, z);
+        else
+            return getLowLut(l, x, y, z);
+    }
 
 public:
+    VoxelData(const char *path, size_t mem);
+    VoxelData(PlyLoader *loader, int sideLength, size_t mem);
+    ~VoxelData();
+
+    inline uint32 getVoxel(int x, int y, int z) const {
+        if (x >= _dataW || y >= _dataH || z >= _dataD)
+            return 0;
+        size_t idx = size_t(x - _bufferX) + _bufferW*(size_t(y - _bufferY) + _bufferH*size_t(z - _bufferZ));
+        return _bufferedData[idx];
+    }
+
+    inline uint32 getVoxelDestructive(int x, int y, int z) {
+        if (x >= _dataW || y >= _dataH || z >= _dataD)
+            return 0;
+        size_t idx = size_t(x - _bufferX) + _bufferW*(size_t(y - _bufferY) + _bufferH*size_t(z - _bufferZ));
+        uint32 value = _bufferedData[idx];
+        if (value)
+            _bufferedData[idx] = 0;
+        return value;
+    }
+
+    inline bool cubeContainsVoxelsDestructive(int x, int y, int z, int size) {
+        if (x >= _dataW || y >= _dataH || z >= _dataD)
+            return false;
+
+        int bit = findHighestBit(size);
+        if (size == 1) {
+            return getVoxel(x, y, z) != 0;
+        } else if (bit < _lowLutLevels) {
+            uint8 value = getLowLut(_lowLutLevels - bit, (x - _bufferX) >> bit, (y - _bufferY) >> bit, (z - _bufferZ) >> bit);
+            if (value != 0)
+                getLowLut(_lowLutLevels - bit, (x - _bufferX) >> bit, (y - _bufferY) >> bit, (z - _bufferZ) >> bit) = 0;
+            return value != 0;
+        } else {
+            return getTopLut(_highestVirtualBit - bit, x >> bit, y >> bit, z >> bit) != 0;
+        }
+    }
+
+    void prepareDataAccess(int x, int y, int z, int size);
 
     int sideLength() const;
     Vec3 getCenter() const;
-
-    uint32_t getVoxel(int x, int y, int z);
-    bool cubeContainsVoxels(int x, int y, int z, int size);
-    void prepareDataAccess(int x, int y, int z, int size);
-
-    VoxelData(const char *path, size_t lutMem, size_t dataMem);
-    VoxelData(PlyLoader *loader, int sideLength, size_t lutMem, size_t dataMem);
-    ~VoxelData();
 };
 
 

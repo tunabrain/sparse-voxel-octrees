@@ -27,6 +27,7 @@ freely, subject to the following restrictions:
 #include "PlyLoader.hpp"
 #include "VoxelData.hpp"
 #include "Events.hpp"
+#include "Timer.hpp"
 #include "Util.hpp"
 
 #include "thread/ThreadUtils.hpp"
@@ -37,7 +38,6 @@ freely, subject to the following restrictions:
 #include "math/Mat4.hpp"
 
 #include <algorithm>
-#include <windows.h>
 #include <stdlib.h>
 #include <iostream>
 #include <stdio.h>
@@ -236,24 +236,28 @@ int renderLoop(void *threadData) {
  * The conversion will still succeed with memory sizes much, much smaller than
  * the size of the voxel data, only slower.
  */
-static const size_t  lutMemory = 512*1024*1024;
-static const size_t dataMemory = 512*1024*1024;
+static const size_t dataMemory = int64_t(1024)*1024*1024;
 
 std::unique_ptr<VoxelOctree> initScene() {
+    Timer timer;
+
 #if GENERATE_IN_MEMORY
-    std::unique_ptr<PlyLoader> loader(new PlyLoader("models/xyzrgb_dragon-tmp.ply"));
-    std::unique_ptr<VoxelData> data(new VoxelData(loader.get(), 256, lutMemory, dataMemory));
+    std::unique_ptr<PlyLoader> loader(new PlyLoader("models/xyzrgb_dragon.ply"));
+    std::unique_ptr<VoxelData> data(new VoxelData(loader.get(), 1024, dataMemory));
     std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
+
     tree->save("models/XYZRGB-Dragon.oct");
 #elif GENERATE_ON_DISK
     std::unique_ptr<PlyLoader> loader(new PlyLoader("models/xyzrgb_dragon.ply"));
-    loader->convertToVolume("models/XYZRGB-Dragon.voxel", 256, lutMemory + dataMemory);
-    std::unique_ptr<VoxelData> data(new VoxelData("models/XYZRGB-Dragon.voxel", lutMemory, dataMemory);
+    loader->convertToVolume("models/XYZRGB-Dragon.voxel", 256, dataMemory);
+    std::unique_ptr<VoxelData> data(new VoxelData("models/XYZRGB-Dragon.voxel", dataMemory));
     std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
     tree->save("models/XYZRGB-Dragon.oct");
 #else
     std::unique_ptr<VoxelOctree> tree(new VoxelOctree("models/XYZRGB-Dragon.oct"));
 #endif
+
+    timer.bench("Octree initialization took");
 
     return std::move(tree);
 }
