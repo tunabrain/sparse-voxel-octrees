@@ -190,23 +190,23 @@ int renderLoop(void *threadData) {
             SDL_UpdateRect(backBuffer, 0, 0, 0, 0);
 
             int event;
-            while ((event = WaitEvent()) != SDL_MOUSEBUTTONDOWN && event != SDL_KEYDOWN && !GetMouseDown(0) && !GetMouseDown(1));
+            while ((event = waitEvent()) != SDL_MOUSEBUTTONDOWN && event != SDL_KEYDOWN && !getMouseDown(0) && !getMouseDown(1));
 
-            if (GetKeyDown(SDLK_ESCAPE)) {
+            if (getKeyDown(SDLK_ESCAPE)) {
                 doTerminate = true;
                 barrier->releaseAll();
             }
 
-            float mx = float(GetMouseXSpeed());
-            float my = float(GetMouseYSpeed());
-            if (GetMouseDown(0) && (mx != 0 || my != 0)) {
+            float mx = float(getMouseXSpeed());
+            float my = float(getMouseYSpeed());
+            if (getMouseDown(0) && (mx != 0 || my != 0)) {
                 Mat4 tform;
                 MatrixStack::get(INV_MODELVIEW_STACK, tform);
                 Vec3 x = tform.transformVector(Vec3(-1.0f, 0.0f, 0.0f));
                 Vec3 y = tform.transformVector(Vec3( 0.0f, 1.0f, 0.0f));
                 Vec3 axis(mx*y.x - my*x.x, mx*y.y - my*x.y, mx*y.z - my*x.z);
                 MatrixStack::mulR(MODEL_STACK, Mat4::rotAxis(axis.normalize(), sqrtf(mx*mx + my*my)));
-            } else if (GetMouseDown(1))
+            } else if (getMouseDown(1))
                 MatrixStack::mulR(VIEW_STACK, Mat4::scale(Vec3(1.0f, 1.0f, 1.0f + my*0.01f)));
 
             if (SDL_MUSTLOCK(backBuffer))

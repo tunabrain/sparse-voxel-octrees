@@ -24,16 +24,16 @@ freely, subject to the following restrictions:
 #ifndef EVENTS_HPP_
 #define EVENTS_HPP_
 
-void CheckEvents();
-int WaitEvent();
-int GetMouseX();
-int GetMouseY();
-int GetMouseZ();
-int GetMouseXSpeed();
-int GetMouseYSpeed();
-int GetMouseZSpeed();
-int GetMouseDown(int button);
-int GetKeyHit(int button);
-int GetKeyDown(int button);
+void checkEvents();
+int waitEvent();
+int getMouseX();
+int getMouseY();
+int getMouseZ();
+int getMouseXSpeed();
+int getMouseYSpeed();
+int getMouseZSpeed();
+int getMouseDown(int button);
+int getKeyHit(int button);
+int getKeyDown(int button);
 
 #endif /* EVENTS_HPP_ */

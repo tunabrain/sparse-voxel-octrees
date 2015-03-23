@@ -78,7 +78,7 @@ static void processEvent(SDL_Event event) {
     }
 }
 
-int WaitEvent() {
+int waitEvent() {
     SDL_Event event;
     SDL_WaitEvent(&event);
     processEvent(event);
@@ -86,25 +86,25 @@ int WaitEvent() {
     return event.type;
 }
 
-void CheckEvents() {
+void checkEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event))
         processEvent(event);
 }
 
-int GetMouseX() {
+int getMouseX() {
     return mouseX;
 }
 
-int GetMouseY() {
+int getMouseY() {
     return mouseY;
 }
 
-int GetMouseZ() {
+int getMouseZ() {
     return mouseZ;
 }
 
-int GetMouseXSpeed() {
+int getMouseXSpeed() {
     int Temp = mouseXSpeed;
 
     mouseXSpeed = 0;
@@ -112,7 +112,7 @@ int GetMouseXSpeed() {
     return Temp;
 }
 
-int GetMouseYSpeed() {
+int getMouseYSpeed() {
     int Temp = mouseYSpeed;
 
     mouseYSpeed = 0;
@@ -120,7 +120,7 @@ int GetMouseYSpeed() {
     return Temp;
 }
 
-int GetMouseZSpeed() {
+int getMouseZSpeed() {
     int Temp = mouseZSpeed;
 
     mouseZSpeed = 0;
@@ -128,11 +128,11 @@ int GetMouseZSpeed() {
     return Temp;
 }
 
-int GetMouseDown(int Button) {
+int getMouseDown(int Button) {
     return mouseDown[Button];
 }
 
-int GetKeyHit(int Key) {
+int getKeyHit(int Key) {
     int Temp = keyHit[Key];
 
     keyHit[Key] = 0;
@@ -140,6 +140,6 @@ int GetKeyHit(int Key) {
     return Temp;
 }
 
-int GetKeyDown(int Key) {
+int getKeyDown(int Key) {
     return keyDown[Key];
 }
