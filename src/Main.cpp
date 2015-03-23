@@ -263,6 +263,7 @@ int main(int /*argc*/, char */*argv*/[]) {
     SDL_WM_SetCaption("Sparse Voxel Octrees", "Sparse Voxel Octrees");
     backBuffer = SDL_SetVideoMode(GWidth, GHeight, 32, SDL_SWSURFACE);
 
+    ThreadUtils::startThreads(ThreadUtils::idealThreadCount());
 
     std::unique_ptr<VoxelOctree> tree = initScene();
 
