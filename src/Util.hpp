@@ -30,16 +30,78 @@ freely, subject to the following restrictions:
 
 std::string prettyPrintMemory(uint64 size);
 
-uint32 compressMaterial(const Vec3 &n, float shade);
-void decompressMaterial(uint32 normal, Vec3 &dst, float &shade);
+static inline float uintBitsToFloat(uint32 i) {
+    union { uint32 i; float f; } unionHack;
+    unionHack.i = i;
+    return unionHack.f;
+}
 
-float invSqrt(float x);
-void fastNormalization(Vec3 &v);
+static inline uint32 floatBitsToUint(float f) {
+    union { uint32 i; float f; } unionHack;
+    unionHack.f = f;
+    return unionHack.i;
+}
 
-float uintBitsToFloat(uint32 i);
-uint32 floatBitsToUint(float f);
+static inline float invSqrt(float x) { //Inverse square root as used in Quake III
+    float x2 = x*0.5f;
+    float y  = x;
 
-int roundToPow2(int In);
+    uint32 i = floatBitsToUint(y);
+    i = 0x5f3759df - (i >> 1);
+
+    y = uintBitsToFloat(i);
+    y = y*(1.5f - x2*y*y);
+
+    return y;
+}
+
+static inline void fastNormalization(Vec3 &v) {
+    v *= invSqrt(v.dot(v));
+}
+
+static inline uint32 compressMaterial(const Vec3 &n, float shade) {
+    const int32 uScale = (1 << 11) - 1;
+    const int32 vScale = (1 << 11) - 1;
+
+    uint32 face = 0;
+    float dominantDir = fabsf(n.x);
+    if (fabsf(n.y) > dominantDir) dominantDir = fabsf(n.y), face = 1;
+    if (fabsf(n.z) > dominantDir) dominantDir = fabsf(n.z), face = 2;
+
+    uint32 sign = n.a[face] < 0.0f;
+
+    const int mod3[] = {0, 1, 2, 0, 1};
+    float n1 = n.a[mod3[face + 1]]/dominantDir;
+    float n2 = n.a[mod3[face + 2]]/dominantDir;
+
+    uint32 u = std::min((int32)((n1*0.5f + 0.5f)*uScale), 0x7FF);
+    uint32 v = std::min((int32)((n2*0.5f + 0.5f)*vScale), 0x7FF);
+    uint32 c = std::min((int32)(shade*127.0f), 0x7F);
+
+    return (sign << 31) | (face << 29) | (u << 18) | v << 7 | c;
+}
+
+static inline void decompressMaterial(uint32 normal, Vec3 &dst, float &shade) {
+    uint32 sign = (normal & 0x80000000) >> 31;
+    uint32 face = (normal & 0x60000000) >> 29;
+    uint32 u    = (normal & 0x1FFC0000) >> 18;
+    uint32 v    = (normal & 0x0003FF80) >> 7;
+    uint32 c    = (normal & 0x0000007F);
+
+    const int mod3[] = {0, 1, 2, 0, 1};
+    dst.a[     face     ] = (sign ? -1.0f : 1.0f);
+    dst.a[mod3[face + 1]] = u*4.8852e-4f*2.0f - 1.0f;
+    dst.a[mod3[face + 2]] = v*4.8852e-4f*2.0f - 1.0f;
+
+    fastNormalization(dst);
+    shade = c*1.0f/127.0f;
+}
+
+static inline int roundToPow2(int x) {
+    int y;
+    for (y = 1; y < x; y *= 2);
+    return y;
+}
 
 //See http://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
 static inline int findHighestBit(uint32 v) {
