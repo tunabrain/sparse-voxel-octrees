@@ -436,7 +436,7 @@ bool PlyLoader::processBlock(uint32 *data, int x, int y, int z, int w, int h, in
         std::cout << "All blocks processed! Post processing...";
     std::cout << std::endl;
 
-    return false;
+    return start == end;
 }
 
 bool PlyLoader::isBlockEmpty(int x, int y, int z)

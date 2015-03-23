@@ -174,11 +174,9 @@ void VoxelData::buildLowLut() {
         upsampleLutLevel<false>(i);
 }
 
-void VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
-    if (_loader) {
-        _loader->processBlock(_bufferedData.get(), x, y, z, w, h, d);
-        return;
-    }
+bool VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
+    if (_loader)
+        return _loader->processBlock(_bufferedData.get(), x, y, z, w, h, d);
 
     uint64_t zStride = _dataH*(uint64_t)_dataW;
     uint64_t yStride = (uint64_t)_dataW;
@@ -203,6 +201,8 @@ void VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
         baseOffset += zStride*sizeof(uint32);
         offset = 0;
     }
+
+    return false;
 }
 
 void VoxelData::init(size_t mem) {
@@ -282,8 +282,9 @@ void VoxelData::prepareDataAccess(int x, int y, int z, int size) {
         _bufferH = height;
         _bufferD = depth;
 
-        cacheData(x, y, z, width, height, depth);
-        buildLowLut();
+        bool emptyBlock = cacheData(x, y, z, width, height, depth);
+        if (!emptyBlock)
+            buildLowLut();
     }
 }
 

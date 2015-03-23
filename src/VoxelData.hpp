@@ -73,7 +73,7 @@ class VoxelData {
     void buildTopLut();
     void buildLowLut();
 
-    void cacheData(int x, int y, int z, int w, int h, int d);
+    bool cacheData(int x, int y, int z, int w, int h, int d);
 
     void init(size_t mem);
 
