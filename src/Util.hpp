@@ -28,6 +28,8 @@ freely, subject to the following restrictions:
 
 #include "IntTypes.hpp"
 
+std::string prettyPrintMemory(uint64 size);
+
 uint32 compressMaterial(const Vec3 &n, float shade);
 void decompressMaterial(uint32 normal, Vec3 &dst, float &shade);
 

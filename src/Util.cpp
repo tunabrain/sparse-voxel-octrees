@@ -23,6 +23,38 @@ freely, subject to the following restrictions:
 
 #include "Util.hpp"
 
+#include <sstream>
+
+std::string prettyPrintMemory(uint64 size)
+{
+    const char *unit;
+    uint64 base;
+    if (size < 1024) {
+        base = 1;
+        unit = " bytes";
+    } else if (size < 1024*1024) {
+        base = 1024;
+        unit = " KB";
+    } else if (size < uint64(1024)*1024*1024) {
+        base = 1024*1024;
+        unit = " MB";
+    } else {
+        base = uint64(1024)*1024*1024;
+        unit = " GB";
+    }
+
+    std::ostringstream out;
+
+    if (size/base < 10)
+        out << ((size*100)/base)*0.01;
+    else if (size/base < 100)
+        out << ((size*10)/base)*0.1;
+    else
+        out << size/base;
+    out << unit;
+
+    return out.str();
+}
 
 uint32 compressMaterial(const Vec3 &n, float shade) {
     const int32 uScale = (1 << 11) - 1;
