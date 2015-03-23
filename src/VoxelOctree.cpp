@@ -95,7 +95,7 @@ VoxelOctree::VoxelOctree(VoxelData *voxels)
     buildOctree(*octreeAllocator, 0, 0, 0, _voxels->sideLength(), 0);
     (*octreeAllocator)[0] |= 1 << 18;
 
-    _octreeSize = octreeAllocator->size();
+    _octreeSize = octreeAllocator->size() + octreeAllocator->insertionCount();
     _octree = octreeAllocator->finalize();
     _center = _voxels->getCenter();
 
