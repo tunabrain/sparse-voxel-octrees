@@ -21,7 +21,6 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <SDL/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -39,6 +38,8 @@ freely, subject to the following restrictions:
 #include "VoxelData.hpp"
 #include "Events.hpp"
 #include "Util.hpp"
+
+#include <SDL.h>
 
 #ifndef M_PI
 #define M_PI        3.14159265358979323846

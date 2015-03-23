@@ -21,9 +21,9 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <SDL/SDL.h>
-
 #include "Events.hpp"
+
+#include <SDL.h>
 
 static int mouseX = 0;
 static int mouseY = 0;

@@ -21,9 +21,9 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <SDL/SDL.h>
-
 #include "ThreadBarrier.hpp"
+
+#include <SDL.h>
 
 ThreadBarrier::ThreadBarrier(int numThreads) : _numThreads(numThreads) {
     _barrierMutex = SDL_CreateMutex();

@@ -24,7 +24,7 @@ freely, subject to the following restrictions:
 #ifndef THREADBARRIER_HPP_
 #define THREADBARRIER_HPP_
 
-#include <SDL/SDL.h> /* Cannot use forward declaration for thread primitives, unfortunately */
+#include <SDL.h> /* Cannot use forward declaration for thread primitives, unfortunately */
 
 class ThreadBarrier {
     int _numThreads;
