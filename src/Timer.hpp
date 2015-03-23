@@ -25,6 +25,7 @@ freely, subject to the following restrictions:
 #define TIMER_HPP_
 
 #include <iostream>
+#include <string>
 #include <chrono>
 #if _WIN32
 #include <windows.h>

@@ -28,6 +28,8 @@ freely, subject to the following restrictions:
 
 #include "IntTypes.hpp"
 
+#include <string>
+
 std::string prettyPrintMemory(uint64 size);
 
 static inline float uintBitsToFloat(uint32 i) {
