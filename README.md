@@ -14,7 +14,19 @@ The XYZRGB dragon belongs the the Stanford 3D Scanning Repository and is availab
 Compilation
 ===========
 
-Compilation requires the SDL (Simple DirectMedia Layer) library. The provided makefile should work on Windows (tested with MinGW) and Linux.
+A recent compiler cupporting C++11, CMake 2.8 and SDL 1.2 are required to build.
+
+To build on Linux, you can use the `setup_builds.sh` shell script to setup build and release configurations using CMake. After running `setup_builds.sh`, run `make` inside the newly created `build/release/` folder. Alternatively, you can use the standard CMake CLI to configure the project.
+
+To build on Windows, you will need Visual Studio 2013 or later. Before running CMake, make sure that
+
+* CMake is on the `PATH` environment variable. An easy check to verify that this is the case is to open CMD and type `cmake`, which should output the CMake CLI help.
+* You have Windows 64bit binaries of SDL 1.2. These are available [here](https://www.libsdl.org/download-1.2.php). Make sure to grab the `SDL-devel-1.2.XX-VC.zip`
+* The environment variable `SDLDIR` exists and is set to the path to the folder containing SDL1.2 (you will have to set it up manually). CMake will use this variable to find the SDL relevant files and configure MSVC to use them
+
+After these prerequisites are setup, you can run `setup_builds.bat` to create the Visual Studio files. It will create a folder `vstudio` containing the `sparse-voxel-octrees.sln` solution.
+
+Alternatively, you can also run CMake manually or setup the MSVC project yourself, without CMake. The sources don't require special build flags, so the latter is easily doable if you can't get CMake to work.
 
 Usage
 =====
