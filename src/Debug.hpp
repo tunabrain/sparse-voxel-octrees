@@ -37,9 +37,9 @@ enum DebugLevel {
 # define ASSERT(EXP, ...) debugAssert(__FILE__, __LINE__, (bool)(EXP), __VA_ARGS__)
 # define FAIL(...) debugFail(__FILE__, __LINE__, __VA_ARGS__)
 #else
-# define DBG(MODULE, LEVEL, FMT, ...)
-# define ASSERT(A, B, ...)
-# define FAIL(A, ...)
+# define DBG(MODULE, LEVEL, FMT, ...) do {} while (0);
+# define ASSERT(A, B, ...) do { (bool)(A); } while (0);
+# define FAIL(A, ...) do {} while (0);
 #endif
 
 void debugLog(const char *module, DebugLevel level, const char *format, ...);
