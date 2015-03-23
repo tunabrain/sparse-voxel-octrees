@@ -21,31 +21,36 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <vector>
-#include <string>
-#include <algorithm>
 
-#include "math/MatrixStack.hpp"
 #include "ThreadBarrier.hpp"
 #include "VoxelOctree.hpp"
-#include "math/Vec3.hpp"
-#include "math/Vec4.hpp"
-#include "math/Mat4.hpp"
 #include "PlyLoader.hpp"
 #include "VoxelData.hpp"
 #include "Events.hpp"
 #include "Util.hpp"
 
+#include "thread/ThreadUtils.hpp"
+#include "thread/ThreadPool.hpp"
+
+#include "math/MatrixStack.hpp"
+#include "math/Vec3.hpp"
+#include "math/Mat4.hpp"
+
+#include <algorithm>
+#include <windows.h>
+#include <stdlib.h>
+#include <iostream>
+#include <stdio.h>
+#include <cstring>
+#include <memory>
+#include <vector>
+#include <string>
+#include <cmath>
 #include <SDL.h>
 
 #ifndef M_PI
 #define M_PI        3.14159265358979323846
 #endif
-
-using namespace std;
 
 /* Number of threads to use - adapt this to your platform for optimal results */
 static const int NumThreads = 16;
@@ -76,10 +81,10 @@ Vec3 shade(int intNormal, const Vec3 &ray, const Vec3 &light) {
     float c;
     decompressMaterial(intNormal, n, c);
 
-    float d = max(light.dot(ray.reflect(n)), 0.0f);
+    float d = std::max(light.dot(ray.reflect(n)), 0.0f);
     float specular = d*d;
 
-    return c*0.9f*fabs(light.dot(n)) + specular*0.2f;
+    return c*0.9f*std::abs(light.dot(n)) + specular*0.2f;
 }
 
 void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy, float zz, const Mat4 &tform, const Vec3 &light, VoxelOctree *tree, const Vec3 &pos, float minT) {
@@ -104,9 +109,9 @@ void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy,
                 col = shade(intNormal, dir, light);
 
             int idx = x*4 + y*pitch;
-            buffer[idx + 0] = (uint8_t)(min(col.x, 1.0f)*255.0);
-            buffer[idx + 1] = (uint8_t)(min(col.y, 1.0f)*255.0);
-            buffer[idx + 2] = (uint8_t)(min(col.z, 1.0f)*255.0);
+            buffer[idx + 0] = (uint8)(std::min(col.x, 1.0f)*255.0);
+            buffer[idx + 1] = (uint8)(std::min(col.y, 1.0f)*255.0);
+            buffer[idx + 2] = (uint8)(std::min(col.z, 1.0f)*255.0);
             buffer[idx + 3] = 0xFF;
         }
     }
@@ -131,13 +136,13 @@ void renderBatch(BatchData *data) {
 
     float scale = 2.0f/GWidth;
     float tileScale = TileSize*scale;
-    float planeDist = 1.0f/tan(float(M_PI)/6.0f);
+    float planeDist = 1.0f/std::tan(float(M_PI)/6.0f);
     float zx = planeDist*tform.a13, zy = planeDist*tform.a23, zz = planeDist*tform.a33;
     float coarseScale = 2.0f*TileSize/(planeDist*GHeight);
 
     Vec3 light = (tform*Vec3(-1.0, 1.0, -1.0)).normalize();
 
-    memset((uint8_t *)backBuffer->pixels + y0*backBuffer->pitch, 0, (y1 - y0)*backBuffer->pitch);
+    std::memset((uint8 *)backBuffer->pixels + y0*backBuffer->pitch, 0, (y1 - y0)*backBuffer->pitch);
 
     float dy = AspectRatio - y0*scale;
     for (int y = 0, idx = 0; y < tilesY; y++, dy -= tileScale) {
@@ -159,16 +164,16 @@ void renderBatch(BatchData *data) {
                 depthBuffer[idx] = TreeMiss;
 
             if (x > 0 && y > 0) {
-                float minT = min(min(depthBuffer[idx], depthBuffer[idx - 1]),
-                    min(depthBuffer[idx - tilesX],
+                float minT = std::min(std::min(depthBuffer[idx], depthBuffer[idx - 1]),
+                    std::min(depthBuffer[idx - tilesX],
                     depthBuffer[idx - tilesX - 1]));
 
                 if (minT != TreeMiss) {
                     int tx0 = (x - 1)*TileSize + x0;
                     int ty0 = (y - 1)*TileSize + y0;
-                    int tx1 = min(tx0 + TileSize, x1);
-                    int ty1 = min(ty0 + TileSize, y1);
-                    renderTile(tx0, ty0, tx1, ty1, scale, zx, zy, zz, tform, light, tree, pos, max(minT - 0.03f, 0.0f));
+                    int tx1 = std::min(tx0 + TileSize, x1);
+                    int ty1 = std::min(ty0 + TileSize, y1);
+                    renderTile(tx0, ty0, tx1, ty1, scale, zx, zy, zz, tform, light, tree, pos, std::max(minT - 0.03f, 0.0f));
                 }
             }
         }
@@ -283,7 +288,7 @@ int main(int /*argc*/, char */*argv*/[]) {
         threadData[i].x0 = 0;
         threadData[i].x1 = GWidth;
         threadData[i].y0 = i*stride;
-        threadData[i].y1 = min((i + 1)*stride, GHeight);
+        threadData[i].y1 = std::min((i + 1)*stride, GHeight);
         threadData[i].tilesX = (threadData[i].x1 - threadData[i].x0 - 1)/TileSize + 2;
         threadData[i].tilesY = (threadData[i].y1 - threadData[i].y0 - 1)/TileSize + 2;
         threadData[i].depthBuffer = new float[threadData[i].tilesX*threadData[i].tilesY];
