@@ -66,6 +66,7 @@ static SDL_Surface *backBuffer;
 static ThreadBarrier *barrier;
 
 static std::atomic<bool> doTerminate;
+static std::atomic<bool> renderHalfSize;
 
 struct BatchData {
     int id;
@@ -88,14 +89,22 @@ Vec3 shade(int intNormal, const Vec3 &ray, const Vec3 &light) {
     return c*0.9f*std::abs(light.dot(n)) + specular*0.2f;
 }
 
-void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy, float zz, const Mat4 &tform, const Vec3 &light, VoxelOctree *tree, const Vec3 &pos, float minT) {
-    uint8 *buffer   = (uint8 *)backBuffer->pixels;
+void renderTile(int x0, int y0, int x1, int y1, int stride, float scale, float zx, float zy, float zz,
+        const Mat4 &tform, const Vec3 &light, VoxelOctree *tree, const Vec3 &pos, float minT) {
+    uint32 *buffer  = (uint32 *)backBuffer->pixels;
     int pitch       = backBuffer->pitch;
 
     float dy = AspectRatio - y0*scale;
-    for (int y = y0; y < y1; y++, dy -= scale) {
+    for (int y = y0; y < y1; ++y, dy -= scale) {
         float dx = -1.0f + x0*scale;
-        for (int x = x0; x < x1; x++, dx += scale) {
+        for (int x = x0; x < x1; ++x, dx += scale) {
+            int cornerX = x - ((x - x0) % stride);
+            int cornerY = y - ((y - y0) % stride);
+            if (cornerX != x || cornerY != y) {
+                buffer[x + y*pitch/4] = buffer[cornerX + cornerY*pitch/4];
+                continue;
+            }
+
             Vec3 dir = Vec3(
                 dx*tform.a11 + dy*tform.a12 + zx,
                 dx*tform.a21 + dy*tform.a22 + zy,
@@ -109,11 +118,13 @@ void renderTile(int x0, int y0, int x1, int y1, float scale, float zx, float zy,
             if (tree->raymarch(pos + dir*minT, dir, 0.0f, intNormal, t))
                 col = shade(intNormal, dir, light);
 
-            int idx = x*4 + y*pitch;
-            buffer[idx + 0] = (uint8)(std::min(col.x, 1.0f)*255.0);
-            buffer[idx + 1] = (uint8)(std::min(col.y, 1.0f)*255.0);
-            buffer[idx + 2] = (uint8)(std::min(col.z, 1.0f)*255.0);
-            buffer[idx + 3] = 0xFF;
+            uint32 color =
+                 uint32(std::min(col.x, 1.0f)*255.0)        |
+                (uint32(std::min(col.y, 1.0f)*255.0) <<  8) |
+                (uint32(std::min(col.z, 1.0f)*255.0) << 16) |
+                0xFF000000u;
+
+            buffer[x + y*pitch/4] = color;
         }
     }
 }
@@ -140,6 +151,7 @@ void renderBatch(BatchData *data) {
     float planeDist = 1.0f/std::tan(float(M_PI)/6.0f);
     float zx = planeDist*tform.a13, zy = planeDist*tform.a23, zz = planeDist*tform.a33;
     float coarseScale = 2.0f*TileSize/(planeDist*GHeight);
+    int stride = renderHalfSize ? 3 : 1;
 
     Vec3 light = (tform*Vec3(-1.0, 1.0, -1.0)).normalize();
 
@@ -174,7 +186,8 @@ void renderBatch(BatchData *data) {
                     int ty0 = (y - 1)*TileSize + y0;
                     int tx1 = std::min(tx0 + TileSize, x1);
                     int ty1 = std::min(ty0 + TileSize, y1);
-                    renderTile(tx0, ty0, tx1, ty1, scale, zx, zy, zz, tform, light, tree, pos, std::max(minT - 0.03f, 0.0f));
+                    renderTile(tx0, ty0, tx1, ty1, stride, scale, zx, zy, zz, tform, light, tree, pos,
+                            std::max(minT - 0.03f, 0.0f));
                 }
             }
         }
@@ -205,7 +218,7 @@ int renderLoop(void *threadData) {
             SDL_UpdateRect(backBuffer, 0, 0, 0, 0);
 
             int event;
-            while ((event = waitEvent()) != SDL_MOUSEBUTTONDOWN && event != SDL_KEYDOWN && !getMouseDown(0) && !getMouseDown(1));
+            while ((event = waitEvent()) && (event == SDL_MOUSEMOTION && !getMouseDown(0) && !getMouseDown(1)));
 
             if (getKeyDown(SDLK_ESCAPE)) {
                 doTerminate = true;
@@ -223,9 +236,14 @@ int renderLoop(void *threadData) {
 
                 MatrixStack::set(MODEL_STACK, Mat4::rotXYZ(Vec3(pitch, 0.0f, 0.0f))*
                         Mat4::rotXYZ(Vec3(0.0f, yaw, 0.0f)));
-            } else if (getMouseDown(1)) {
-                radius *= std::min(std::max(1.0f + my*0.01f, 0.5f), 1.5f);
+                renderHalfSize = true;
+            } else if (getMouseDown(1) && my != 0) {
+                radius *= std::min(std::max(1.0f - my*0.01f, 0.5f), 1.5f);
+                radius = std::min(radius, 25.0f);
                 MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0f, 0.0f, -radius)));
+                renderHalfSize = true;
+            } else {
+                renderHalfSize = false;
             }
 
             if (SDL_MUSTLOCK(backBuffer))
