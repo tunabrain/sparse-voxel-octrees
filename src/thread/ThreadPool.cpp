@@ -71,7 +71,7 @@ void ThreadPool::startThreads()
 {
     _terminateFlag = false;
     for (uint32 i = 0; i < _threadCount; ++i) {
-        _workers.emplace_back(new std::thread(&ThreadPool::runWorker, this, _workers.size()));
+        _workers.emplace_back(new std::thread(&ThreadPool::runWorker, this, uint32(_workers.size())));
         _idToNumericId.insert(std::make_pair(_workers.back()->get_id(), i));
     }
 }

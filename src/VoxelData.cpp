@@ -50,8 +50,8 @@ VoxelData::VoxelData(const char *path, size_t mem) : _loader(0) {
 VoxelData::VoxelData(PlyLoader *loader, int sideLength, size_t mem) : _dataStream(0), _loader(loader) {
     loader->suggestedDimensions(sideLength, _dataW, _dataH, _dataD);
     init(mem);
-    loader->setupBlockProcessing(sideLength, _maxCacheableSize, _maxCacheableSize, _maxCacheableSize,
-            _dataW, _dataH, _dataD);
+    int size = int(_maxCacheableSize);
+    loader->setupBlockProcessing(sideLength, size, size, size, _dataW, _dataH, _dataD);
     buildTopLut();
 }
 
@@ -238,7 +238,7 @@ void VoxelData::init(size_t mem) {
 
     _lowLutLevels = largestLowerLevel;
     _topLutLevels = _highestVirtualBit - largestLowerLevel + 1;
-    _maxCacheableSize = 1 << largestLowerLevel;
+    _maxCacheableSize = size_t(1) << largestLowerLevel;
 
     _topLut.reset(new uint8[countCellsInHiarchicalGrid(_topLutLevels)]());
     _lowLut.reset(new uint8[countCellsInHiarchicalGrid(_lowLutLevels)]());

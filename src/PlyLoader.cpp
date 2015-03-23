@@ -286,10 +286,10 @@ void PlyLoader::buildBlockLists()
 
     _blockLists.reset(new uint32[_blockOffsets.back()]);
 
-    for (size_t i = 0; i < _tris.size(); ++i)
+    for (uint32 i = 0; i < _tris.size(); ++i)
         iterateOverlappingBlocks(_tris[i], [&](size_t idx) { _blockLists[_blockOffsets[idx]++] = i; });
 
-    for (int i = _blockOffsets.size() - 1; i >= 1; --i)
+    for (int i = int(_blockOffsets.size() - 1); i >= 1; --i)
         _blockOffsets[i] = _blockOffsets[i - 1];
     _blockOffsets[0] = 0;
 
