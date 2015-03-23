@@ -18,3 +18,7 @@ freely, subject to the following restrictions:
 
    3. This notice may not be removed or altered from any source
    distribution.
+
+The CMake models in the cmake/ subfolder were written by Alexander Neundorf,
+Matthias Kretz and Nathan Osman and come with their own licenses. See the
+respective .cmake files for more information.
