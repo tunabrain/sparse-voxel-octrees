@@ -239,27 +239,23 @@ int renderLoop(void *threadData) {
 static const size_t  lutMemory = 512*1024*1024;
 static const size_t dataMemory = 512*1024*1024;
 
-VoxelOctree *initScene() {
+std::unique_ptr<VoxelOctree> initScene() {
 #if GENERATE_IN_MEMORY
-    PlyLoader *loader = new PlyLoader("models/xyzrgb_dragon.ply");
-    VoxelData *data = new VoxelData(loader, 256, lutMemory, dataMemory);
-    VoxelOctree *tree = new VoxelOctree(data);
-    delete data;
-    delete loader;
+    std::unique_ptr<PlyLoader> loader(new PlyLoader("models/xyzrgb_dragon-tmp.ply"));
+    std::unique_ptr<VoxelData> data(new VoxelData(loader.get(), 256, lutMemory, dataMemory));
+    std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
     tree->save("models/XYZRGB-Dragon.oct");
 #elif GENERATE_ON_DISK
-    PlyLoader *loader = new PlyLoader("models/xyzrgb_dragon.ply");
+    std::unique_ptr<PlyLoader> loader(new PlyLoader("models/xyzrgb_dragon.ply"));
     loader->convertToVolume("models/XYZRGB-Dragon.voxel", 256, lutMemory + dataMemory);
-    VoxelData *data = new VoxelData("models/XYZRGB-Dragon.voxel", lutMemory, dataMemory);
-    VoxelOctree *tree = new VoxelOctree(data);
-    delete data;
-    delete loader;
+    std::unique_ptr<VoxelData> data(new VoxelData("models/XYZRGB-Dragon.voxel", lutMemory, dataMemory);
+    std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
     tree->save("models/XYZRGB-Dragon.oct");
 #else
-    VoxelOctree *tree = new VoxelOctree("models/XYZRGB-Dragon.oct");
+    std::unique_ptr<VoxelOctree> tree(new VoxelOctree("models/XYZRGB-Dragon.oct"));
 #endif
 
-    return tree;
+    return std::move(tree);
 }
 
 int main(int /*argc*/, char */*argv*/[]) {
@@ -267,10 +263,10 @@ int main(int /*argc*/, char */*argv*/[]) {
     SDL_WM_SetCaption("Sparse Voxel Octrees", "Sparse Voxel Octrees");
     backBuffer = SDL_SetVideoMode(GWidth, GHeight, 32, SDL_SWSURFACE);
 
-    VoxelOctree *tree = initScene();
 
     MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0, 0.0, -2.0)));
     MatrixStack::set(MODEL_STACK, Mat4::scale(Vec3(1.0, 1.0, -1.0)));
+    std::unique_ptr<VoxelOctree> tree = initScene();
 
     SDL_Thread *threads[NumThreads - 1];
     BatchData threadData[NumThreads];
@@ -284,7 +280,7 @@ int main(int /*argc*/, char */*argv*/[]) {
     int stride = (GHeight - 1)/NumThreads + 1;
     for (int i = 0; i < NumThreads; i++) {
         threadData[i].id = i;
-        threadData[i].tree = tree;
+        threadData[i].tree = tree.get();
         threadData[i].x0 = 0;
         threadData[i].x1 = GWidth;
         threadData[i].y0 = i*stride;
