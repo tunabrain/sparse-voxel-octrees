@@ -264,9 +264,10 @@ int main(int /*argc*/, char */*argv*/[]) {
     backBuffer = SDL_SetVideoMode(GWidth, GHeight, 32, SDL_SWSURFACE);
 
 
-    MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0, 0.0, -2.0)));
-    MatrixStack::set(MODEL_STACK, Mat4::scale(Vec3(1.0, 1.0, -1.0)));
     std::unique_ptr<VoxelOctree> tree = initScene();
+
+    MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0f, 0.0f, -2.0f)));
+    MatrixStack::set(MODEL_STACK, Mat4::scale(Vec3(1.0f, 1.0f, -1.0f)));
 
     SDL_Thread *threads[NumThreads - 1];
     BatchData threadData[NumThreads];
