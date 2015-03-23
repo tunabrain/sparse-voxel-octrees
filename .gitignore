@@ -1,9 +1,12 @@
-# Binaries
-*.exe
-*.o
-*.dll
-
-# Models/Voxel files
-*.voxel
-*.ply
-*.dat
+/*
+/*/
+!/.gitignore
+!/CMakeLists.txt
+!/setup_builds.sh
+!/setup_builds.bat
+!/Header.png
+!/README.md
+!/LICENSE
+!/src/
+!/models/
+!/cmake/
