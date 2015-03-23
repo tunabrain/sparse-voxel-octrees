@@ -184,6 +184,15 @@ void renderBatch(BatchData *data) {
 int renderLoop(void *threadData) {
     BatchData *data = (BatchData *)threadData;
 
+    float radius = 1.0f;
+    float pitch = 0.0f;
+    float yaw = 0.0f;
+
+    if (data->id == 0) {
+        MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0f, 0.0f, -radius)));
+        MatrixStack::set(MODEL_STACK, Mat4());
+    }
+
     while (!doTerminate) {
         barrier->waitPre();
         renderBatch(data);
@@ -206,14 +215,18 @@ int renderLoop(void *threadData) {
             float mx = float(getMouseXSpeed());
             float my = float(getMouseYSpeed());
             if (getMouseDown(0) && (mx != 0 || my != 0)) {
-                Mat4 tform;
-                MatrixStack::get(INV_MODELVIEW_STACK, tform);
-                Vec3 x = tform.transformVector(Vec3(-1.0f, 0.0f, 0.0f));
-                Vec3 y = tform.transformVector(Vec3( 0.0f, 1.0f, 0.0f));
-                Vec3 axis(mx*y.x - my*x.x, mx*y.y - my*x.y, mx*y.z - my*x.z);
-                MatrixStack::mulR(MODEL_STACK, Mat4::rotAxis(axis.normalize(), sqrtf(mx*mx + my*my)));
-            } else if (getMouseDown(1))
-                MatrixStack::mulR(VIEW_STACK, Mat4::scale(Vec3(1.0f, 1.0f, 1.0f + my*0.01f)));
+                pitch = std::fmod(pitch - my, 360.0f);
+                yaw = std::fmod(yaw + (std::fabs(pitch) > 90.0f ? mx : -mx), 360.0f);
+
+                     if (pitch >  180.0f) pitch -= 360.0f;
+                else if (pitch < -180.0f) pitch += 360.0f;
+
+                MatrixStack::set(MODEL_STACK, Mat4::rotXYZ(Vec3(pitch, 0.0f, 0.0f))*
+                        Mat4::rotXYZ(Vec3(0.0f, yaw, 0.0f)));
+            } else if (getMouseDown(1)) {
+                radius *= std::min(std::max(1.0f + my*0.01f, 0.5f), 1.5f);
+                MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0f, 0.0f, -radius)));
+            }
 
             if (SDL_MUSTLOCK(backBuffer))
                 SDL_LockSurface(backBuffer);
@@ -271,9 +284,6 @@ int main(int /*argc*/, char */*argv*/[]) {
     ThreadUtils::startThreads(ThreadUtils::idealThreadCount());
 
     std::unique_ptr<VoxelOctree> tree = initScene();
-
-    MatrixStack::set(VIEW_STACK, Mat4::translate(Vec3(0.0f, 0.0f, -2.0f)));
-    MatrixStack::set(MODEL_STACK, Mat4::scale(Vec3(1.0f, 1.0f, -1.0f)));
 
     SDL_Thread *threads[NumThreads - 1];
     BatchData threadData[NumThreads];
