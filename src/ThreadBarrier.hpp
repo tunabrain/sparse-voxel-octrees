@@ -33,12 +33,12 @@ class ThreadBarrier {
     SDL_mutex *_barrierMutex;
     SDL_sem *_turnstile1, *_turnstile2;
 public:
+    ThreadBarrier(int numThreads);
+     ~ThreadBarrier();
+
     void waitPre();
     void waitPost();
     void releaseAll();
-
-    ThreadBarrier(int numThreads);
-     ~ThreadBarrier();
 };
 
 #endif /* THREADBARRIER_HPP_ */
