@@ -26,6 +26,8 @@ freely, subject to the following restrictions:
 #include "Debug.hpp"
 #include "Util.hpp"
 
+#include "third-party/lz4.h"
+
 #include <algorithm>
 #include <iostream>
 #include <stdio.h>
@@ -50,23 +52,40 @@ static const uint32 BitCount[] = {
     4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
 };
 
+static const size_t CompressionBlockSize = 64*1024*1024;
+
 VoxelOctree::VoxelOctree(const char *path) : _voxels(0) {
     FILE *fp = fopen(path, "rb");
 
     if (fp) {
+
         fread(_center.a, sizeof(float), 3, fp);
         fread(&_octreeSize, sizeof(uint64), 1, fp);
 
         _octree.reset(new uint32[_octreeSize]);
 
-        // Work around bug in certain C runtime libraries that choke on freads larger than 4GB
-        const uint64 step = uint64(256)*1024*1024;
-        for (uint64 offset = 0; offset < _octreeSize; offset += step)
-            fread(&_octree[offset], sizeof(uint32), std::min(step, _octreeSize - offset), fp);
+        std::unique_ptr<char[]> buffer(new char[LZ4_compressBound(CompressionBlockSize)]);
+        char *dst = reinterpret_cast<char *>(_octree.get());
+
+        LZ4_streamDecode_t *stream = LZ4_createStreamDecode();
+        LZ4_setStreamDecode(stream, dst, 0);
+
+        uint64 compressedSize = 0;
+        for (uint64 offset = 0; offset < _octreeSize*sizeof(uint32); offset += CompressionBlockSize) {
+            uint64 compSize;
+            fread(&compSize, sizeof(uint64), 1, fp);
+            fread(buffer.get(), sizeof(char), size_t(compSize), fp);
+
+            int outSize = int(std::min(_octreeSize*sizeof(uint32) - offset, CompressionBlockSize));
+            LZ4_decompress_fast_continue(stream, buffer.get(), dst + offset, outSize);
+            compressedSize += compSize + 8;
+        }
+        LZ4_freeStreamDecode(stream);
 
         fclose(fp);
 
-        std::cout << "Octree size: " << prettyPrintMemory(_octreeSize*sizeof(uint32)) << std::endl;
+        std::cout << "Octree size: " << prettyPrintMemory(_octreeSize*sizeof(uint32))
+                  << " Compressed size: " << prettyPrintMemory(compressedSize) << std::endl;
     }
 }
 
@@ -77,12 +96,29 @@ void VoxelOctree::save(const char *path) {
         fwrite(_center.a, sizeof(float), 3, fp);
         fwrite(&_octreeSize, sizeof(uint64), 1, fp);
 
-        // Work around bug in certain C runtime libraries that choke on fwrites larger than 4GB
-        const uint64 step = uint64(256)*1024*1024;
-        for (uint64 offset = 0; offset < _octreeSize; offset += step)
-            fwrite(&_octree[offset], sizeof(uint32), std::min(step, _octreeSize - offset), fp);
+        LZ4_stream_t *stream = LZ4_createStream();
+        LZ4_resetStream(stream);
+
+        std::unique_ptr<char[]> buffer(new char[LZ4_compressBound(CompressionBlockSize)]);
+        const char *src = reinterpret_cast<char *>(_octree.get());
+
+        uint64 compressedSize = 0;
+        for (uint64 offset = 0; offset < _octreeSize*sizeof(uint32); offset += CompressionBlockSize) {
+            int outSize = int(std::min(_octreeSize*sizeof(uint32) - offset, uint64(CompressionBlockSize)));
+            uint64 compSize = LZ4_compress_continue(stream, src + offset, buffer.get(), outSize);
+
+            fwrite(&compSize, sizeof(uint64), 1, fp);
+            fwrite(buffer.get(), sizeof(char), size_t(compSize), fp);
+
+            compressedSize += compSize + 8;
+        }
+
+        LZ4_freeStream(stream);
 
         fclose(fp);
+
+        std::cout << "Octree size: " << prettyPrintMemory(_octreeSize*sizeof(uint32))
+                  << " Compressed size: " << prettyPrintMemory(compressedSize) << std::endl;
     }
 }
 
@@ -98,8 +134,6 @@ VoxelOctree::VoxelOctree(VoxelData *voxels)
     _octreeSize = octreeAllocator->size() + octreeAllocator->insertionCount();
     _octree = octreeAllocator->finalize();
     _center = _voxels->getCenter();
-
-    std::cout << "Octree size: " << prettyPrintMemory(_octreeSize*sizeof(uint32)) << std::endl;
 }
 
 uint64 VoxelOctree::buildOctree(ChunkedAllocator<uint32> &allocator, int x, int y, int z, int size, uint64 descriptorIndex) {
