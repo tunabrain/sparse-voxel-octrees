@@ -70,13 +70,16 @@ class PlyLoader {
     int _sideLength;
     int _volumeW, _volumeH, _volumeD;
     int _blockW, _blockH, _blockD;
+    int _subBlockW, _subBlockH, _subBlockD;
+    int _partitionW, _partitionH, _partitionD;
+    int _numPartitions;
     int _gridW, _gridH, _gridD;
     int _bufferX, _bufferY, _bufferZ;
     int _bufferW, _bufferH, _bufferD;
 
     void writeTriangleCell(uint32 *data, int x, int y, int z,
             float cx, float cy, float cz, const Triangle &t);
-    void triangleToVolume(uint32 *data, const Triangle &t);
+    void triangleToVolume(uint32 *data, const Triangle &t, int offX, int offY, int offZ);
 
     void openPly(const char *path, PlyFile *&file);
     void readVertices(PlyFile *file);
@@ -98,7 +101,7 @@ public:
     size_t blockMemRequirement(int w, int h, int d);
     void setupBlockProcessing(int sideLength, int blockW, int blockH, int blockD,
             int volumeW, int volumeH, int volumeD);
-    bool processBlock(uint32 *data, int x, int y, int z, int w, int h, int d);
+    void processBlock(uint32 *data, int x, int y, int z, int w, int h, int d);
     bool isBlockEmpty(int x, int y, int z);
     void teardownBlockProcessing();
 

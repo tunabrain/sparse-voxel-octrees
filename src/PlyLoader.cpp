@@ -237,15 +237,15 @@ void PlyLoader::iterateOverlappingBlocks(const Triangle &t, LoopBody body)
     int ux, uy, uz;
     pointToGrid(t.lower, lx, ly, lz);
     pointToGrid(t.upper, ux, uy, uz);
-    int lgridX = (lx + 0)/_blockW, lgridY = (ly + 0)/_blockH, lgridZ = (lz + 0)/_blockD;
-    int ugridX = (ux + 1)/_blockW, ugridY = (uy + 1)/_blockH, ugridZ = (uz + 1)/_blockD;
+    int lgridX = (lx + 0)/_subBlockW, lgridY = (ly + 0)/_subBlockH, lgridZ = (lz + 0)/_subBlockD;
+    int ugridX = (ux + 1)/_subBlockW, ugridY = (uy + 1)/_subBlockH, ugridZ = (uz + 1)/_subBlockD;
 
     int maxSide = std::max(ugridX - lgridX, std::max(ugridY - lgridY, ugridZ - lgridZ));
 
     if (maxSide > 0) {
-        float hx = _blockW/float(_sideLength - 2);
-        float hy = _blockH/float(_sideLength - 2);
-        float hz = _blockD/float(_sideLength - 2);
+        float hx = _subBlockW/float(_sideLength - 2);
+        float hy = _subBlockH/float(_sideLength - 2);
+        float hz = _subBlockD/float(_sideLength - 2);
         float triVs[][3] = {
             {t.v1.pos.x, t.v1.pos.y, t.v1.pos.z},
             {t.v2.pos.x, t.v2.pos.y, t.v2.pos.z},
@@ -275,11 +275,6 @@ void PlyLoader::buildBlockLists()
 
     for (size_t i = 0; i < _tris.size(); ++i)
         iterateOverlappingBlocks(_tris[i], [&](size_t idx) { _blockOffsets[1 + idx]++; });
-
-    _numNonZeroBlocks = 0;
-    for (size_t i = 1; i < _blockOffsets.size(); ++i)
-        if (_blockOffsets[i])
-            _numNonZeroBlocks++;
 
     for (size_t i = 1; i < _blockOffsets.size(); ++i)
         _blockOffsets[i] += _blockOffsets[i - 1];
@@ -340,18 +335,18 @@ void PlyLoader::writeTriangleCell(uint32 *data, int x, int y, int z,
     }
 }
 
-void PlyLoader::triangleToVolume(uint32 *data, const Triangle &t) {
+void PlyLoader::triangleToVolume(uint32 *data, const Triangle &t, int offX, int offY, int offZ) {
     int lx, ly, lz;
     int ux, uy, uz;
     pointToGrid(t.lower, lx, ly, lz);
     pointToGrid(t.upper, ux, uy, uz);
 
-    lx = std::max(lx, _bufferX);
-    ly = std::max(ly, _bufferY);
-    lz = std::max(lz, _bufferZ);
-    ux = std::min(ux, _bufferX + _bufferW - 1);
-    uy = std::min(uy, _bufferY + _bufferH - 1);
-    uz = std::min(uz, _bufferZ + _bufferD - 1);
+    lx = std::max(lx, _bufferX + offX);
+    ly = std::max(ly, _bufferY + offY);
+    lz = std::max(lz, _bufferZ + offZ);
+    ux = std::min(ux, _bufferX + std::min(offX + _subBlockW, _bufferW) - 1);
+    uy = std::min(uy, _bufferY + std::min(offY + _subBlockH, _bufferH) - 1);
+    uz = std::min(uz, _bufferZ + std::min(offZ + _subBlockD, _bufferD) - 1);
 
     if (lx > ux || ly > uy || lz > uz)
         return;
@@ -383,6 +378,32 @@ size_t PlyLoader::blockMemRequirement(int w, int h, int d) {
     return elementCost*size_t(w)*size_t(h)*size_t(d);
 }
 
+void findBestBlockPartition(int &w, int &h, int &d, int numThreads)
+{
+    auto maximum = [&]() -> int& {
+        if (w > h && w > d) return w; else if (h > d) return h; else return d;
+    };
+    auto median = [&]() -> int& {
+        int max = std::max(w, std::max(h, d));
+        int min = std::min(w, std::min(h, d));
+        if (w != min && w != max) return w;
+        else if (h != min && h != max) return h;
+        else return d;
+    };
+    auto minimum = [&]() -> int& {
+        if (w < h && w < d) return w; else if (h < d) return h; else return d;
+    };
+
+    int usedThreads = 1;
+    while (usedThreads < numThreads) {
+             if ((maximum() % 2) == 0) maximum() /= 2;
+        else if (( median() % 2) == 0)  median() /= 2;
+        else if ((minimum() % 2) == 0) minimum() /= 2;
+        else break;
+        usedThreads *= 2;
+    }
+}
+
 void PlyLoader::setupBlockProcessing(int sideLength, int blockW, int blockH, int blockD,
         int volumeW, int volumeH, int volumeD) {
     _conversionTimer.start();
@@ -391,22 +412,31 @@ void PlyLoader::setupBlockProcessing(int sideLength, int blockW, int blockH, int
     _counts.reset(new uint8[elementCount]);
 
     _sideLength = sideLength - 2;
-    _blockW = blockW;
-    _blockH = blockH;
-    _blockD = blockD;
+    _blockW = _subBlockW = blockW;
+    _blockH = _subBlockH = blockH;
+    _blockD = _subBlockD = blockD;
+    findBestBlockPartition(_subBlockW, _subBlockH, _subBlockD, ThreadUtils::pool->threadCount());
+    _partitionW = _blockW/_subBlockW;
+    _partitionH = _blockH/_subBlockH;
+    _partitionD = _blockD/_subBlockD;
+    _numPartitions = _partitionW*_partitionH*_partitionD;
+    std::cout << "Partitioning cache block into " << _partitionW << "x" << _partitionH
+              << "x" << _partitionD << " over " << _numPartitions << " threads (per thread block is "
+              << _subBlockW << "x" << _subBlockH << "x" << _subBlockD << ")" << std::endl;
     _volumeW = volumeW;
     _volumeH = volumeH;
     _volumeD = volumeD;
-    _gridW = (_volumeW + _blockW - 1)/_blockW;
-    _gridH = (_volumeH + _blockH - 1)/_blockH;
-    _gridD = (_volumeD + _blockD - 1)/_blockD;
+    _gridW = _partitionW*(_volumeW + _blockW - 1)/_blockW;
+    _gridH = _partitionH*(_volumeH + _blockH - 1)/_blockH;
+    _gridD = _partitionD*(_volumeD + _blockD - 1)/_blockD;
 
     _processedBlocks = 0;
+    _numNonZeroBlocks = 0;
 
     buildBlockLists();
 }
 
-bool PlyLoader::processBlock(uint32 *data, int x, int y, int z, int w, int h, int d) {
+void PlyLoader::processBlock(uint32 *data, int x, int y, int z, int w, int h, int d) {
     _bufferX = x;
     _bufferY = y;
     _bufferZ = z;
@@ -414,12 +444,18 @@ bool PlyLoader::processBlock(uint32 *data, int x, int y, int z, int w, int h, in
     _bufferH = h;
     _bufferD = d;
 
-    int blockIdx = (x/_blockW) + _gridW*((y/_blockH) + _gridH*(z/_blockD));
-    int start = _blockOffsets[blockIdx];
-    int end   = _blockOffsets[blockIdx + 1];
+    ThreadUtils::pool->enqueue([&](uint32 i, uint32, uint32){
+        int px = i % _partitionW;
+        int py = (i/_partitionW) % _partitionH;
+        int pz = i/(_partitionW*_partitionH);
 
-    for (int i = start; i < end; ++i)
-        triangleToVolume(data, _tris[_blockLists[i]]);
+        int blockIdx = (x/_subBlockW + px) + _gridW*((y/_subBlockH + py) + _gridH*(z/_subBlockD + pz));
+        int start = _blockOffsets[blockIdx];
+        int end   = _blockOffsets[blockIdx + 1];
+
+        for (int i = start; i < end; ++i)
+            triangleToVolume(data, _tris[_blockLists[i]], px*_subBlockW, py*_subBlockH, pz*_subBlockD);
+    }, _numPartitions)->wait();
 
     _processedBlocks++;
 
@@ -435,17 +471,25 @@ bool PlyLoader::processBlock(uint32 *data, int x, int y, int z, int w, int h, in
     else
         std::cout << "All blocks processed! Post processing...";
     std::cout << std::endl;
-
-    return start == end;
 }
 
 bool PlyLoader::isBlockEmpty(int x, int y, int z)
 {
-    int blockIdx = (x/_blockW) + _gridW*((y/_blockH) + _gridH*(z/_blockD));
-    int start = _blockOffsets[blockIdx];
-    int end   = _blockOffsets[blockIdx + 1];
+    for (int pz = 0; pz < _partitionD; ++pz) {
+        for (int py = 0; py < _partitionH; ++py) {
+            for (int px = 0; px < _partitionW; ++px) {
+                int blockIdx = (x/_subBlockW + px) + _gridW*((y/_subBlockH + py) + _gridH*(z/_subBlockD + pz));
+                int start = _blockOffsets[blockIdx];
+                int end   = _blockOffsets[blockIdx + 1];
 
-    return start == end;
+                if (start != end) {
+                    _numNonZeroBlocks++;
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 void PlyLoader::teardownBlockProcessing() {
@@ -479,9 +523,7 @@ void PlyLoader::convertToVolume(const char *path, int maxSize, size_t memoryBudg
     fwrite(&d, 4, 1, fp);
 
     for (int z = 0; z < d; z += sliceZ) {
-        bool blockEmpty = processBlock(data, 0, 0, z, w, h, sliceZ);
-        if (blockEmpty)
-            std::memset(data, 0, size_t(w)*size_t(h)*size_t(sliceZ)*sizeof(uint32));
+        processBlock(data, 0, 0, z, w, h, sliceZ);
 
         fwrite(data, sizeof(uint32), size_t(w)*size_t(h)*size_t(std::min(sliceZ, d - z)), fp);
     }
