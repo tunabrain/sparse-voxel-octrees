@@ -22,3 +22,59 @@ freely, subject to the following restrictions:
 The CMake models in the cmake/ subfolder were written by Alexander Neundorf,
 Matthias Kretz and Nathan Osman and come with their own licenses. See the
 respective .cmake files for more information.
+
+The files src/third-party/tribox.c and src/third-party/tribox.h are courtesy
+of Tomas Akenine-Moller
+
+The files src/third-party/lc4.c and src/third-party/lc4.h are part of the LZ4
+compression library available here: https://github.com/Cyan4973/lz4
+
+Its license text is reproduced here
+
+   LZ4 - Fast LZ compression algorithm
+   Copyright (C) 2011-2015, Yann Collet.
+
+   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are
+   met:
+
+       * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+       * Redistributions in binary form must reproduce the above
+   copyright notice, this list of conditions and the following disclaimer
+   in the documentation and/or other materials provided with the
+   distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+   You can contact the author at :
+   - LZ4 source repository : https://github.com/Cyan4973/lz4
+   - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
+   
+
+The files src/third-party/ply.h and src/third-party/plyfile.c are part of the PLY
+library. Its license text is reproduced here
+
+    Copyright (c) 1994 The Board of Trustees of The Leland Stanford
+    Junior University.  All rights reserved.   
+      
+    Permission to use, copy, modify and distribute this software and its   
+    documentation for any purpose is hereby granted without fee, provided   
+    that the above copyright notice and this permission notice appear in   
+    all copies of this software and that you do not sell the software.   
+      
+    THE SOFTWARE IS PROVIDED "AS IS" AND WITHOUT WARRANTY OF ANY KIND,   
+    EXPRESS, IMPLIED OR OTHERWISE, INCLUDING WITHOUT LIMITATION, ANY   
+    WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.   
