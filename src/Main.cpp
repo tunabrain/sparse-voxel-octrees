@@ -262,111 +262,111 @@ int renderLoop(void *threadData) {
 static const size_t dataMemory = int64_t(1024)*1024*1024;
 
 void printHelp() {
-	std::cout << "Usage: sparse-voxel-octrees [options] filename ..." << std::endl;
-	std::cout << "Options:" << std::endl;
-	std::cout << "-builder				set program to SVO building mode." << std::endl;
-	std::cout << "  --resolution <r>		set voxel resolution. r is an integer which equals to a power of 2." << std::endl;
-	std::cout << "  --mode <m>			set where to generate voxel data, m equals 0 or 1, where 0 indicates GENERATE_IN_MEMORY while 1 indicates GENERATE_ON_DISK." << std::endl;
-	std::cout << "-viewer				set program to SVO rendering mode." << std::endl << std::endl;
-	std::cout << "Examples:" << std::endl;
-	std::cout << "  sparse-voxel-octrees -builder --resolution 256 --mode 0 ../models/xyzrgb_dragon.ply ../models/xyzrgb_dragon.oct" << std::endl;
-	std::cout << "  sparse-voxel-octrees -builder ../models/xyzrgb_dragon.ply ../models/xyzrgb_dragon.oct" << std::endl;
-	std::cout << "  sparse-voxel-octrees -viewer ../models/XYZRGB-Dragon.oct" << std::endl << std::endl << std::endl;
+    std::cout << "Usage: sparse-voxel-octrees [options] filename ..." << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "-builder				set program to SVO building mode." << std::endl;
+    std::cout << "  --resolution <r>		set voxel resolution. r is an integer which equals to a power of 2." << std::endl;
+    std::cout << "  --mode <m>			set where to generate voxel data, m equals 0 or 1, where 0 indicates GENERATE_IN_MEMORY while 1 indicates GENERATE_ON_DISK." << std::endl;
+    std::cout << "-viewer				set program to SVO rendering mode." << std::endl << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  sparse-voxel-octrees -builder --resolution 256 --mode 0 ../models/xyzrgb_dragon.ply ../models/xyzrgb_dragon.oct" << std::endl;
+    std::cout << "  sparse-voxel-octrees -builder ../models/xyzrgb_dragon.ply ../models/xyzrgb_dragon.oct" << std::endl;
+    std::cout << "  sparse-voxel-octrees -viewer ../models/XYZRGB-Dragon.oct" << std::endl << std::endl << std::endl;
 }
 
 int main(int argc, char *argv[]) {
-	
-	unsigned int resolution = 256;	//default resolution
-	unsigned int mode = 0;			//default to generate in memory
-	std::string inputFile = "";
-	std::string outputFile = "";
-	
-	/* parse arguments */
-	if ((argc == 8) && (std::string(argv[1]) == "-builder"))	{
-		resolution = atoi(argv[3]);
-		mode = atoi(argv[5]);
-		inputFile = argv[6];
-		outputFile = argv[7];
-	}
-	else if ((argc == 4) && (std::string(argv[1]) == "-builder"))	{
-		inputFile = argv[2];
-		outputFile = argv[3];
-	}
-	else if ((argc == 3) && (std::string(argv[1]) == "-viewer"))	
-		inputFile = argv[2];
-	else {
-		std::cout << "Invalid arguments! Please refer to the help info!" << std::endl;
-		printHelp();
-		return 0;
-	}
+    
+    unsigned int resolution = 256;	//default resolution
+    unsigned int mode = 0;			//default to generate in memory
+    std::string inputFile = "";
+    std::string outputFile = "";
+    
+    /* parse arguments */
+    if ((argc == 8) && (std::string(argv[1]) == "-builder"))	{
+        resolution = atoi(argv[3]);
+        mode = atoi(argv[5]);
+        inputFile = argv[6];
+        outputFile = argv[7];
+    }
+    else if ((argc == 4) && (std::string(argv[1]) == "-builder"))	{
+        inputFile = argv[2];
+        outputFile = argv[3];
+    }
+    else if ((argc == 3) && (std::string(argv[1]) == "-viewer"))	
+        inputFile = argv[2];
+    else {
+        std::cout << "Invalid arguments! Please refer to the help info!" << std::endl;
+        printHelp();
+        return 0;
+    }
 
-	Timer timer;
-	
-	if (std::string(argv[1]) == "-builder")	{
-		ThreadUtils::startThreads(ThreadUtils::idealThreadCount());
+    Timer timer;
+    
+    if (std::string(argv[1]) == "-builder")	{
+        ThreadUtils::startThreads(ThreadUtils::idealThreadCount());
 
-		if (mode) {	//generate on disk
-			std::unique_ptr<PlyLoader> loader(new PlyLoader(inputFile.c_str()));
-			loader->convertToVolume("models/temp.voxel", 256, dataMemory);
-			std::unique_ptr<VoxelData> data(new VoxelData("models/temp.voxel", dataMemory));
-			std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
-			tree->save(outputFile.c_str());
-		} 
-		else {		//generate in memory
-			std::unique_ptr<PlyLoader> loader(new PlyLoader(inputFile.c_str()));
-			std::unique_ptr<VoxelData> data(new VoxelData(loader.get(), 1024, dataMemory));
-			std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
-			tree->save(outputFile.c_str());
-		}
-		timer.bench("Octree initialization took");
-		return 0;
-	}
+        if (mode) {	//generate on disk
+            std::unique_ptr<PlyLoader> loader(new PlyLoader(inputFile.c_str()));
+            loader->convertToVolume("models/temp.voxel", 256, dataMemory);
+            std::unique_ptr<VoxelData> data(new VoxelData("models/temp.voxel", dataMemory));
+            std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
+            tree->save(outputFile.c_str());
+        } 
+        else {		//generate in memory
+            std::unique_ptr<PlyLoader> loader(new PlyLoader(inputFile.c_str()));
+            std::unique_ptr<VoxelData> data(new VoxelData(loader.get(), 1024, dataMemory));
+            std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
+            tree->save(outputFile.c_str());
+        }
+        timer.bench("Octree initialization took");
+        return 0;
+    }
 
-	if (std::string(argv[1]) == "-viewer")	{
-		std::unique_ptr<VoxelOctree> tree(new VoxelOctree(inputFile.c_str()));
+    if (std::string(argv[1]) == "-viewer")	{
+        std::unique_ptr<VoxelOctree> tree(new VoxelOctree(inputFile.c_str()));
 
-		timer.bench("Octree initialization took");
+        timer.bench("Octree initialization took");
 
-		SDL_Init(SDL_INIT_VIDEO);
+        SDL_Init(SDL_INIT_VIDEO);
 
-		SDL_WM_SetCaption("Sparse Voxel Octrees", "Sparse Voxel Octrees");
-		backBuffer = SDL_SetVideoMode(GWidth, GHeight, 32, SDL_SWSURFACE);
+        SDL_WM_SetCaption("Sparse Voxel Octrees", "Sparse Voxel Octrees");
+        backBuffer = SDL_SetVideoMode(GWidth, GHeight, 32, SDL_SWSURFACE);
 
-		SDL_Thread *threads[NumThreads - 1];
-		BatchData threadData[NumThreads];
+        SDL_Thread *threads[NumThreads - 1];
+        BatchData threadData[NumThreads];
 
-		barrier = new ThreadBarrier(NumThreads);
-		doTerminate = false;
+        barrier = new ThreadBarrier(NumThreads);
+        doTerminate = false;
 
-		if (SDL_MUSTLOCK(backBuffer))
-			SDL_LockSurface(backBuffer);
+        if (SDL_MUSTLOCK(backBuffer))
+            SDL_LockSurface(backBuffer);
 
-		int stride = (GHeight - 1) / NumThreads + 1;
-		for (int i = 0; i < NumThreads; i++) {
-			threadData[i].id = i;
-			threadData[i].tree = tree.get();
-			threadData[i].x0 = 0;
-			threadData[i].x1 = GWidth;
-			threadData[i].y0 = i*stride;
-			threadData[i].y1 = std::min((i + 1)*stride, GHeight);
-			threadData[i].tilesX = (threadData[i].x1 - threadData[i].x0 - 1) / TileSize + 2;
-			threadData[i].tilesY = (threadData[i].y1 - threadData[i].y0 - 1) / TileSize + 2;
-			threadData[i].depthBuffer = new float[threadData[i].tilesX*threadData[i].tilesY];
-		}
+        int stride = (GHeight - 1) / NumThreads + 1;
+        for (int i = 0; i < NumThreads; i++) {
+            threadData[i].id = i;
+            threadData[i].tree = tree.get();
+            threadData[i].x0 = 0;
+            threadData[i].x1 = GWidth;
+            threadData[i].y0 = i*stride;
+            threadData[i].y1 = std::min((i + 1)*stride, GHeight);
+            threadData[i].tilesX = (threadData[i].x1 - threadData[i].x0 - 1) / TileSize + 2;
+            threadData[i].tilesY = (threadData[i].y1 - threadData[i].y0 - 1) / TileSize + 2;
+            threadData[i].depthBuffer = new float[threadData[i].tilesX*threadData[i].tilesY];
+        }
 
-		for (int i = 1; i < NumThreads; i++)
-			threads[i - 1] = SDL_CreateThread(&renderLoop, (void *)&threadData[i]);
+        for (int i = 1; i < NumThreads; i++)
+            threads[i - 1] = SDL_CreateThread(&renderLoop, (void *)&threadData[i]);
 
-		renderLoop((void *)&threadData[0]);
+        renderLoop((void *)&threadData[0]);
 
-		for (int i = 1; i < NumThreads; i++)
-			SDL_WaitThread(threads[i - 1], 0);
+        for (int i = 1; i < NumThreads; i++)
+            SDL_WaitThread(threads[i - 1], 0);
 
-		if (SDL_MUSTLOCK(backBuffer))
-			SDL_UnlockSurface(backBuffer);
+        if (SDL_MUSTLOCK(backBuffer))
+            SDL_UnlockSurface(backBuffer);
 
-		SDL_Quit();
-	}
+        SDL_Quit();
+    }
 
     return 0;
 }
