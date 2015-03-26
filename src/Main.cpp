@@ -264,10 +264,10 @@ static const size_t dataMemory = int64_t(1024)*1024*1024;
 void printHelp() {
     std::cout << "Usage: sparse-voxel-octrees [options] filename ..." << std::endl;
     std::cout << "Options:" << std::endl;
-    std::cout << "-builder				set program to SVO building mode." << std::endl;
-    std::cout << "  --resolution <r>		set voxel resolution. r is an integer which equals to a power of 2." << std::endl;
-    std::cout << "  --mode <m>			set where to generate voxel data, m equals 0 or 1, where 0 indicates GENERATE_IN_MEMORY while 1 indicates GENERATE_ON_DISK." << std::endl;
-    std::cout << "-viewer				set program to SVO rendering mode." << std::endl << std::endl;
+    std::cout << "-builder              set program to SVO building mode." << std::endl;
+    std::cout << "  --resolution <r>    set voxel resolution. r is an integer which equals to a power of 2." << std::endl;
+    std::cout << "  --mode <m>          set where to generate voxel data, m equals 0 or 1, where 0 indicates GENERATE_IN_MEMORY while 1 indicates GENERATE_ON_DISK." << std::endl;
+    std::cout << "-viewer               set program to SVO rendering mode." << std::endl << std::endl;
     std::cout << "Examples:" << std::endl;
     std::cout << "  sparse-voxel-octrees -builder --resolution 256 --mode 0 ../models/xyzrgb_dragon.ply ../models/xyzrgb_dragon.oct" << std::endl;
     std::cout << "  sparse-voxel-octrees -builder ../models/xyzrgb_dragon.ply ../models/xyzrgb_dragon.oct" << std::endl;
@@ -276,23 +276,23 @@ void printHelp() {
 
 int main(int argc, char *argv[]) {
     
-    unsigned int resolution = 256;	//default resolution
-    unsigned int mode = 0;			//default to generate in memory
+    unsigned int resolution = 256;  //default resolution
+    unsigned int mode = 0;          //default to generate in memory
     std::string inputFile = "";
     std::string outputFile = "";
     
     /* parse arguments */
-    if ((argc == 8) && (std::string(argv[1]) == "-builder"))	{
+    if ((argc == 8) && (std::string(argv[1]) == "-builder")) {
         resolution = atoi(argv[3]);
         mode = atoi(argv[5]);
         inputFile = argv[6];
         outputFile = argv[7];
     }
-    else if ((argc == 4) && (std::string(argv[1]) == "-builder"))	{
+    else if ((argc == 4) && (std::string(argv[1]) == "-builder")) {
         inputFile = argv[2];
         outputFile = argv[3];
     }
-    else if ((argc == 3) && (std::string(argv[1]) == "-viewer"))	
+    else if ((argc == 3) && (std::string(argv[1]) == "-viewer")) 
         inputFile = argv[2];
     else {
         std::cout << "Invalid arguments! Please refer to the help info!" << std::endl;
@@ -302,17 +302,17 @@ int main(int argc, char *argv[]) {
 
     Timer timer;
     
-    if (std::string(argv[1]) == "-builder")	{
+    if (std::string(argv[1]) == "-builder") {
         ThreadUtils::startThreads(ThreadUtils::idealThreadCount());
 
-        if (mode) {	//generate on disk
+        if (mode) { //generate on disk
             std::unique_ptr<PlyLoader> loader(new PlyLoader(inputFile.c_str()));
             loader->convertToVolume("models/temp.voxel", 256, dataMemory);
             std::unique_ptr<VoxelData> data(new VoxelData("models/temp.voxel", dataMemory));
             std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
             tree->save(outputFile.c_str());
         } 
-        else {		//generate in memory
+        else {      //generate in memory
             std::unique_ptr<PlyLoader> loader(new PlyLoader(inputFile.c_str()));
             std::unique_ptr<VoxelData> data(new VoxelData(loader.get(), 1024, dataMemory));
             std::unique_ptr<VoxelOctree> tree(new VoxelOctree(data.get()));
@@ -322,7 +322,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    if (std::string(argv[1]) == "-viewer")	{
+    if (std::string(argv[1]) == "-viewer")  {
         std::unique_ptr<VoxelOctree> tree(new VoxelOctree(inputFile.c_str()));
 
         timer.bench("Octree initialization took");
