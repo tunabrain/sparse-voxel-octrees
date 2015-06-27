@@ -118,12 +118,19 @@ void renderTile(int x0, int y0, int x1, int y1, int stride, float scale, float z
             if (tree->raymarch(pos + dir*minT, dir, 0.0f, intNormal, t))
                 col = shade(intNormal, dir, light);
 
+#ifdef __APPLE__
+            uint32 color =
+                 uint32(std::min(col.x, 1.0f)*255.0) <<  8   |
+                (uint32(std::min(col.y, 1.0f)*255.0) <<  16) |
+                (uint32(std::min(col.z, 1.0f)*255.0) <<  24) |
+                0x000000FFu;
+#else
             uint32 color =
                  uint32(std::min(col.x, 1.0f)*255.0)        |
                 (uint32(std::min(col.y, 1.0f)*255.0) <<  8) |
                 (uint32(std::min(col.z, 1.0f)*255.0) << 16) |
                 0xFF000000u;
-
+#endif
             buffer[x + y*pitch/4] = color;
         }
     }
