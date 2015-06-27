@@ -192,9 +192,12 @@ void VoxelData::cacheData(int x, int y, int z, int w, int h, int d) {
         for (uint64_t voxelY = 0; voxelY < (unsigned)h; voxelY++) {
 #ifdef _MSC_VER
             _fseeki64(_dataStream, baseOffset + offset, SEEK_SET);
+#elif __APPLE__
+            fseeko(_dataStream, baseOffset + offset, SEEK_SET);
 #else
             fseeko64(_dataStream, baseOffset + offset, SEEK_SET);
 #endif
+
             fread(_bufferedData.get() + (voxelY + voxelZ*h)*w, sizeof(uint32), w, _dataStream);
 
             offset += yStride*sizeof(uint32);
