@@ -29,7 +29,7 @@ endif()
 find_package(SDL REQUIRED)
 
 include_directories(src ${SDL_INCLUDE_DIR})
-file(GLOB_RECURSE Sources "src/*.hpp" "src/*.cpp" "src/*.c")
+file(GLOB_RECURSE Sources "src/*.hpp" "src/*.cpp" "src/*.c" "src/*.m")
 if (WIN32)
     add_executable(sparse-voxel-octrees WIN32 ${Sources})
 else()

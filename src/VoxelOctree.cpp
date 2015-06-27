@@ -76,7 +76,7 @@ VoxelOctree::VoxelOctree(const char *path) : _voxels(0) {
             fread(&compSize, sizeof(uint64), 1, fp);
             fread(buffer.get(), sizeof(char), size_t(compSize), fp);
 
-            int outSize = int(std::min(_octreeSize*sizeof(uint32) - offset, CompressionBlockSize));
+            int outSize = std::min<int>(_octreeSize*sizeof(uint32) - offset, CompressionBlockSize);
             LZ4_decompress_fast_continue(stream, buffer.get(), dst + offset, outSize);
             compressedSize += compSize + 8;
         }
