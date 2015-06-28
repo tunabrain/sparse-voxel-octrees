@@ -29,7 +29,12 @@ endif()
 find_package(SDL REQUIRED)
 
 include_directories(src ${SDL_INCLUDE_DIR})
-file(GLOB_RECURSE Sources "src/*.hpp" "src/*.cpp" "src/*.c" "src/*.m")
+file(GLOB_RECURSE Sources "src/*.hpp" "src/*.cpp" "src/*.c")
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(Sources ${Sources} "src/SDLMain.m")
+endif()
+
 if (WIN32)
     add_executable(sparse-voxel-octrees WIN32 ${Sources})
 else()
