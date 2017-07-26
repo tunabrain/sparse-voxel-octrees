@@ -28,6 +28,22 @@ After these prerequisites are setup, you can run `setup_builds.bat` to create th
 
 Alternatively, you can also run CMake manually or setup the MSVC project yourself, without CMake. The sources don't require special build flags, so the latter is easily doable if you can't get CMake to work.
 
+To build on macOS, you will need to install SDL first (i.e. `brew install sdl`). Then build it like a regular CMake project:
+
+    mkdir build
+    cd build
+    cmake ../
+    make
+    ./sparse-voxel-octrees -viewer ../models/XYZRGB-Dragon.oct
+
+On macOS, you may need to click+drag within the application window first to make the render visible.
+
+Note: If building fails on macOS, you can try commenting out the follow lines in <code>CMakeLists.txt</code>
+
+    #if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    #    set(Sources ${Sources} "src/SDLMain.m")
+    #endif()
+
 Usage
 =====
 
