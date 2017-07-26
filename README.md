@@ -21,8 +21,8 @@ To build on Linux, you can use the `setup_builds.sh` shell script to setup build
 To build on Windows, you will need Visual Studio 2013 or later. Before running CMake, make sure that
 
 * CMake is on the `PATH` environment variable. An easy check to verify that this is the case is to open CMD and type `cmake`, which should output the CMake CLI help.
-* You have Windows 64bit binaries of SDL 1.2. These are available [here](https://www.libsdl.org/download-1.2.php). Make sure to grab the `SDL-devel-1.2.XX-VC.zip`
-* The environment variable `SDLDIR` exists and is set to the path to the folder containing SDL1.2 (you will have to set it up manually). CMake will use this variable to find the SDL relevant files and configure MSVC to use them
+* You have Windows 64bit binaries of SDL 1.2. These are available [here](https://www.libsdl.org/download-1.2.php). Make sure to grab the `SDL-devel-1.2.XX-VC.zip`. Note that if you are using a newer version of Visual Studio, you may need to compile SDL yourself in order to be compatible. Please see the SDL website for details
+* The environment variable `SDLDIR` exists and is set to the path to the folder containing SDL1.2 (you will have to set it up manually - it needs to be a system environment variable, not a user variable, for CMake to find it). CMake will use this variable to find the SDL relevant files and configure MSVC to use them
 
 After these prerequisites are setup, you can run `setup_builds.bat` to create the Visual Studio files. It will create a folder `vstudio` containing the `sparse-voxel-octrees.sln` solution.
 
@@ -31,9 +31,9 @@ Alternatively, you can also run CMake manually or setup the MSVC project yoursel
 Usage
 =====
 
-On startup, the program will load the sample octree and render it. Left mouse rotates the model, right mouse zooms. Escape quits the program.
+On startup, the program will load the sample octree and render it. Left mouse rotates the model, right mouse zooms. Escape quits the program. In order to make CLI arguments easier on Windows, you can use <code>run_viewer.bat</code> to start the viewer.
 
-Note that due to repository size considerations, the sample octree has poor resolution (256x256x256). You can generate larger octrees using the code, however. See <code>Main.cpp:initScene</code> for details. 
+Note that due to repository size considerations, the sample octree has poor resolution (256x256x256). You can generate larger octrees using the code, however. See <code>Main.cpp:initScene</code> for details. You can also use <code>run_builder.bat</code> to build the XYZ RGB dragon model. To do this, simply download the XYZ RGB dragon model from http://graphics.stanford.edu/data/3Dscanrep/ and place it in the <code>models</code> folder.
 
 Code
 ====
